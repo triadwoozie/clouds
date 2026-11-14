@@ -115,6 +115,69 @@ pub fn vfs_read(path: &Path) -> Option<Vec<u8>> {
     None
 }
 
+/// List immediate entries (files and directory names) in `dir`.
+pub fn list_dir(dir: &Path) -> Vec<String> {
+    let mut results = std::collections::BTreeSet::new();
+    let dir_str = dir.to_str().unwrap_or("").trim_start_matches('.').trim_start_matches('/');
+    let dir_clean = dir_str.trim_matches('/');
+
+    // 1. From global prepared files
+    if let Some(files) = global_prepared() {
+        let prefix = if dir_clean.is_empty() {
+            String::new()
+        } else {
+            format!("{dir_clean}/")
+        };
+        for entry in &files.entries {
+            let name = files.name(entry);
+            if prefix.is_empty() {
+                if let Some(first) = name.split('/').next() {
+                    if !first.is_empty() {
+                        results.insert(first.to_string());
+                    }
+                }
+            } else if name.starts_with(&prefix) {
+                let remainder = &name[prefix.len()..];
+                if let Some(first) = remainder.split('/').next() {
+                    if !first.is_empty() {
+                        results.insert(first.to_string());
+                    }
+                }
+            }
+        }
+    }
+
+    // 2. From VFS
+    let vfs_keys: Vec<String> = {
+        let lock = VFS.lock().unwrap_or_else(PoisonError::into_inner);
+        lock.keys().cloned().collect()
+    };
+    let prefix = if dir_clean.is_empty() {
+        String::new()
+    } else {
+        format!("{dir_clean}/")
+    };
+    for path in vfs_keys {
+        let clean = path.trim_start_matches('.').trim_start_matches('/').trim_matches('/');
+        if prefix.is_empty() {
+            if let Some(first) = clean.split('/').next() {
+                if !first.is_empty() {
+                    results.insert(first.to_string());
+                }
+            }
+        } else if clean.starts_with(&prefix) {
+            let remainder = &clean[prefix.len()..];
+            if let Some(first) = remainder.split('/').next() {
+                if !first.is_empty() {
+                    results.insert(first.to_string());
+                }
+            }
+        }
+    }
+
+    results.into_iter().collect()
+}
+
 impl PreparedFiles {
     fn name(&self, entry: &Entry) -> &str {
         &self.names[entry.name.0 as usize..][..entry.name.1 as usize]
@@ -174,7 +237,8 @@ impl PreparedFiles {
         }
         let index = &bytes[HEADER..index_end as usize];
         let (_written_root, rest) = index.split_at(pad(root_len) as usize);
-        let (_source, rest) = rest.split_at(pad(source_len) as usize);
+        let (source, rest) = rest.split_at(pad(source_len) as usize);
+        vfs_write("horizon-resources.json", source[..source_len as usize].to_vec());
         let (raw_entries, pool) = rest.split_at(index_len as usize);
         let Ok(names_str) = std::str::from_utf8(&pool[..pool_len as usize]) else {
             return Ok(None);
@@ -331,6 +395,9 @@ pub fn read(path: &Path) -> io::Result<Vec<u8>> {
             if let Some(bytes) = vfs_read(path) {
                 Ok(bytes)
             } else {
+                #[cfg(target_arch = "wasm32")]
+                return Err(io::ErrorKind::NotFound.into());
+                #[cfg(not(target_arch = "wasm32"))]
                 fs::read(path)
             }
         }

@@ -1931,9 +1931,12 @@ fn instance_descriptor(
     dx12_compiler: wgpu::Dx12Compiler,
 ) -> wgpu::InstanceDescriptor {
     let mut descriptor = wgpu::InstanceDescriptor::new_without_display_handle();
+    #[cfg(not(target_arch = "wasm32"))]
     if let Some(window) = window {
         descriptor = descriptor.with_display_handle(Box::new(WindowDisplay(window.clone())));
     }
+    #[cfg(target_arch = "wasm32")]
+    let _ = window;
     descriptor.backends = backends.with_env();
     let dx12 = cfg!(windows) && descriptor.backends.contains(wgpu::Backends::DX12);
     // FXC spends about 2.6 s on every start compiling the pipelines (DXC about
@@ -1988,6 +1991,17 @@ impl wgpu::rwh::HasDisplayHandle for WindowDisplay {
 /// crash in the driver can't be
 /// caught in the game; the launcher switches the setting to DirectX 12 after one at
 /// the renderer's start (#746). macOS has Metal only.
+#[cfg(target_arch = "wasm32")]
+fn backend_order(
+    _api: GraphicsApi,
+    _os: &str,
+    _arch: &str,
+    _wgpu_backend: bool,
+) -> Vec<wgpu::Backends> {
+    vec![wgpu::Backends::BROWSER_WEBGPU]
+}
+
+#[cfg(not(target_arch = "wasm32"))]
 fn backend_order(
     api: GraphicsApi,
     os: &str,
@@ -2015,10 +2029,15 @@ fn backends_name(backends: wgpu::Backends) -> &'static str {
         wgpu::Backends::VULKAN => "Vulkan",
         wgpu::Backends::DX12 => "DirectX 12",
         wgpu::Backends::GL => "OpenGL",
+        wgpu::Backends::BROWSER_WEBGPU => "WebGPU",
         _ => "graphics",
     }
 }
-/// Whether an adapter renders on the CPU (WARP, llvmpipe).
+#[cfg(target_arch = "wasm32")]
+fn is_software(_kind: wgpu::DeviceType) -> bool {
+    false
+}
+#[cfg(not(target_arch = "wasm32"))]
 fn is_software(kind: wgpu::DeviceType) -> bool {
     kind == wgpu::DeviceType::Cpu
 }
@@ -2159,6 +2178,14 @@ fn draws_frame(format: wgpu::TextureFormatFeatures) -> bool {
 /// survive from the world to the tonemap and the HDR pass.
 const LINEAR_FRAME: wgpu::TextureFormat = wgpu::TextureFormat::Rgba16Float;
 
+#[cfg(target_arch = "wasm32")]
+pub static PRELOADED_GPU: std::sync::OnceLock<(wgpu::Instance, wgpu::Adapter, wgpu::Device, wgpu::Queue)> = std::sync::OnceLock::new();
+
+#[cfg(target_arch = "wasm32")]
+pub fn set_preloaded_gpu(instance: wgpu::Instance, adapter: wgpu::Adapter, device: wgpu::Device, queue: wgpu::Queue) {
+    let _ = PRELOADED_GPU.set((instance, adapter, device, queue));
+}
+
 /// Opens a device on the first of `backend_order`'s backends that gives one.
 /// Offscreen rendering needs no surface, so it can use a GPU the window's
 /// display cannot present from (a headless compositor).
@@ -2168,6 +2195,43 @@ async fn open_device(
     api: GraphicsApi,
     layers: u32,
 ) -> Result<Opened> {
+    #[cfg(target_arch = "wasm32")]
+    if let Some((instance, adapter, device, queue)) = PRELOADED_GPU.get() {
+        let surface = if offscreen {
+            None
+        } else {
+            Some(instance.create_surface(window.clone()).map_err(|e| e.to_string())?)
+        };
+        let device_lost = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let configured = match &surface {
+            Some(s) => {
+                let caps = s.get_capabilities(adapter);
+                let size = window.inner_size();
+                let conf = surface_setup::set_up_surface(
+                    s,
+                    adapter,
+                    device,
+                    &device_lost,
+                    caps,
+                    size,
+                    None,
+                    true,
+                ).map_err(|e| e.to_string())?;
+                Some(conf)
+            }
+            None => None,
+        };
+        log::info!("Horizon renderer: using preloaded WebGPU adapter and device.");
+        return Ok(Opened {
+            instance: instance.clone(),
+            surface,
+            adapter: adapter.clone(),
+            device: device.clone(),
+            queue: queue.clone(),
+            device_lost,
+            configured,
+        });
+    }
     let wgpu_backend = std::env::var_os("WGPU_BACKEND").is_some();
     let mut first = None;
     for (order, allow_cpu) in device_search(
@@ -2205,6 +2269,17 @@ async fn open_device(
 /// DirectX 12 only through WARP and its GPU through OpenGL (#5185), and a Fermi GPU has no
 /// Vulkan or DirectX 12 driver but OpenGL (#3978). DirectX 12 never falls back to Vulkan: the
 /// launcher chooses it after Vulkan crashed in the driver (#746), which the game can't catch.
+#[cfg(target_arch = "wasm32")]
+fn device_search(
+    _api: GraphicsApi,
+    _os: &str,
+    _arch: &str,
+    _wgpu_backend: bool,
+) -> Vec<(Vec<wgpu::Backends>, bool)> {
+    vec![(vec![wgpu::Backends::BROWSER_WEBGPU], true)]
+}
+
+#[cfg(not(target_arch = "wasm32"))]
 fn device_search(
     api: GraphicsApi,
     os: &str,
@@ -2492,13 +2567,15 @@ async fn open_dxc(
 /// What to tell a player whose system offers no usable graphics adapter.
 /// Vulkan is loaded at run time (the game links no graphics library), so a
 /// missing driver shows here rather than as a missing-DLL dialog.
-#[cfg(target_os = "windows")]
+#[cfg(target_arch = "wasm32")]
+const NO_GPU_DRIVER: &str = "No WebGPU graphics adapter found in browser: please ensure WebGPU is enabled in your browser";
+#[cfg(all(not(target_arch = "wasm32"), target_os = "windows"))]
 const NO_GPU_DRIVER: &str = "No graphics driver with Vulkan, DirectX 12 or OpenGL found: Horizon needs \
      a GPU driver with one of them. Install the latest driver for your NVIDIA, AMD or Intel GPU and \
      start the game again";
-#[cfg(target_os = "macos")]
+#[cfg(all(not(target_arch = "wasm32"), target_os = "macos"))]
 const NO_GPU_DRIVER: &str = "No Metal graphics device found";
-#[cfg(not(any(target_os = "windows", target_os = "macos")))]
+#[cfg(all(not(target_arch = "wasm32"), not(any(target_os = "windows", target_os = "macos"))))]
 const NO_GPU_DRIVER: &str = "No Vulkan or OpenGL graphics driver found: Horizon needs the Vulkan loader \
      (libvulkan.so.1) and a Vulkan driver for your GPU (Mesa's, or NVIDIA's), or OpenGL through EGL";
 /// Logs a step of the renderer's start, for a native crash in the graphics

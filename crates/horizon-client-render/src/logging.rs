@@ -29,6 +29,8 @@ const FLOOD_WINDOW: Duration = Duration::from_secs(60);
 
 /// The platform data folder (what the `dirs` crate's data_dir gives).
 pub fn data_dir() -> PathBuf {
+    #[cfg(target_arch = "wasm32")]
+    return PathBuf::from(".");
     let env = |k: &str| {
         std::env::var_os(k)
             .filter(|v| !v.is_empty())
@@ -76,6 +78,8 @@ pub fn set_player_dir(dir: PathBuf) {
 /// The folder of this player's own files: `--player-dir`, else the game folder (the working
 /// directory, where the launcher runs the game).
 pub fn player_dir() -> PathBuf {
+    #[cfg(target_arch = "wasm32")]
+    return PathBuf::from(".");
     PLAYER
         .get()
         .cloned()
@@ -91,6 +95,8 @@ pub fn player_dir_override() -> Option<&'static Path> {
 /// `options_dir` (the enabled mods): that folder, unless `--player-dir` moved `options.txt`
 /// out of the game folder.
 pub fn shared_dir(options_dir: &Path) -> PathBuf {
+    #[cfg(target_arch = "wasm32")]
+    return PathBuf::from(".");
     shared_dir_of(PLAYER.get().map(PathBuf::as_path), options_dir, || {
         std::env::current_dir().unwrap_or_default()
     })
@@ -111,6 +117,8 @@ fn shared_dir_of(
 /// Where the launcher runs the game and keeps its saves: `--home`, else `HORIZON_HOME`, else
 /// `horizon` in the platform data folder (launcher/src/backend.rs `game_home`).
 pub fn game_home() -> PathBuf {
+    #[cfg(target_arch = "wasm32")]
+    return PathBuf::from(".");
     if let Some(home) = HOME.get() {
         return home.clone();
     }

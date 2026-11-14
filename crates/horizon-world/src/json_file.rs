@@ -10,7 +10,7 @@ use std::{fs, io, path::Path};
 
 /// `path`'s bytes; an I/O error names the file.
 pub fn read_bytes(path: &Path) -> io::Result<Vec<u8>> {
-    fs::read(path).map_err(|e| named(path, e))
+    horizon_core::prepared_files::read(path).map_err(|e| named(path, e))
 }
 
 /// `bytes` as JSON; a parse error names `path`.

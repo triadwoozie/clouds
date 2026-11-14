@@ -634,7 +634,7 @@ pub fn load_registry_with_flags(root: &Path) -> io::Result<(BlockRegistry, Vec<(
         return Ok(cached);
     }
     // Read whole, then parsed from the slice: see `BlockRegistry::from_facts_json_bytes`.
-    let loaded = BlockRegistry::from_facts_json_bytes(&fs::read(root.join("facts.json"))?)?;
+    let loaded = BlockRegistry::from_facts_json_bytes(&horizon_core::prepared_files::read(&root.join("facts.json"))?)?;
     cache::store_registry(root, &loaded.0, &loaded.1);
     Ok(loaded)
 }

@@ -2031,21 +2031,12 @@ body.pointer-locked .hud-bar {
         clouds_vfs_write('horizon-data.bin', bin);
       }
 
-      // 2. Pass root JSON/NBT files
-      const rootFiles = [
-        'horizon-resources.json', 'registries.json', 'items.json',
-        'block-behaviours.json', 'commands.json', 'command-registries.json',
-        'entity-models.json', 'entity-types.json', 'facts.json',
-        'gameplay-facts.json', 'model-states.json', 'movement-properties.nbt',
-        'occlusion.nbt', 'damage-catalog.json', 'damage-tags.json', 'damage-types.json',
-        'creative-inventory.json', 'landing-definitions.json', 'mob-data.json',
-        'render-definitions.json'
-      ];
-
-      for (const rf of rootFiles) {
-        if (await vfs.fileExists(rf)) {
-          const bytes = await vfs.readFile(rf);
-          clouds_vfs_write(rf, bytes);
+      // 2. Pass all cached resource files into Rust VFS
+      const allFiles = await vfs.listFiles('');
+      for (const file of allFiles) {
+        if (file !== 'horizon-data.bin' && !file.startsWith('saves/')) {
+          const bytes = await vfs.readFile(file);
+          clouds_vfs_write(file, bytes);
         }
       }
 
@@ -2058,7 +2049,7 @@ body.pointer-locked .hud-bar {
 
       window.CloudsWeb.onEngineReady();
       window.CloudsWeb.onLog('info', `Loading world "${config.worldName}"...`);
-      clouds_start(config.username, config.worldName, config.renderDistance, config.creative);
+      await clouds_start(config.username, config.worldName, config.renderDistance, config.creative);
     } catch (err) {
       window.CloudsWeb.onError(err);
     }

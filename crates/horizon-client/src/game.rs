@@ -7637,7 +7637,9 @@ impl Game<'_> {
         lan::forget_sync_data();
         self.title = Some(
             Title::new(
-                std::env::current_dir()?.join("saves"),
+                std::env::current_dir()
+                    .unwrap_or_else(|_| std::path::PathBuf::from("."))
+                    .join("saves"),
                 &self.options.resources,
             )
             .with_user(|| self.options.player_name()),
@@ -11358,7 +11360,8 @@ impl<'a> Game<'a> {
         streaming.paused = true;
         let level = Level::default();
         let save = Arc::new(SaveDir::new(
-            std::env::current_dir()?
+            std::env::current_dir()
+                .unwrap_or_else(|_| std::path::PathBuf::from("."))
                 .join("saves")
                 .join(".horizon-title"),
             horizon_client::save::LevelShape::OVERWORLD,
@@ -12348,8 +12351,6 @@ pub fn run_with() -> Result<()> {
     // shared resources.
     #[cfg(not(target_arch = "wasm32"))]
     Behaviours::set_cache_dir(std::env::current_dir()?.join(".horizon-cache"));
-    #[cfg(target_arch = "wasm32")]
-    Behaviours::set_cache_dir(std::path::PathBuf::from(".horizon-cache"));
     if !synchronous_startup(&options) {
         return run_loading(options, early_settings, vanilla_root, None, started);
     }
