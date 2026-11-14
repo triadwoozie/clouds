@@ -837,13 +837,13 @@ body.pointer-locked .hud-bar {
         <span>Clouds</span>
       </div>
       <span id="status-coi" class="status-chip status-chip--neutral status-chip--hide-sm" title="Cross-Origin Isolation (SharedArrayBuffer)">
-        Checking COI…
+        Checking Speed...
       </span>
       <span id="status-webgpu" class="status-chip status-chip--neutral status-chip--hide-sm" title="WebGPU Adapter Status">
-        Checking WebGPU…
+        Checking Graphics...
       </span>
       <span id="status-storage" class="status-chip status-chip--neutral" title="Local Asset Storage">
-        Storage…
+        Saves...
       </span>
     </div>
 
@@ -860,7 +860,7 @@ body.pointer-locked .hud-bar {
       <div class="modal-header">
         <div>
           <h1 id="onboarding-title" class="modal-title">Clouds 26.3</h1>
-          <p class="modal-subtitle">Static Rust/Wasm WebGPU client. Your assets stay local in browser storage.</p>
+          <p class="modal-subtitle">Play directly in your browser. Your game files stay private on this device.</p>
         </div>
       </div>
 
@@ -869,19 +869,19 @@ body.pointer-locked .hud-bar {
         <div id="view-cached-ready" class="field-stack" hidden>
           <div class="surface-panel row-between">
             <div>
-              <div style="font-weight: 600;">Local resources ready</div>
+              <div style="font-weight: 600;">Game files ready</div>
               <div id="cached-summary" class="modal-subtitle" style="margin-top: 2px;">Detected assets in local storage</div>
             </div>
             <div style="display: flex; gap: var(--space-2); align-items: center;">
-              <span class="status-chip status-chip--success">Cached</span>
-              <button type="button" id="btn-purge-assets" class="btn btn--danger btn--sm" title="Delete cached game resources from browser storage">Purge Cache</button>
+              <span class="status-chip status-chip--success">Ready</span>
+              <button type="button" id="btn-purge-assets" class="btn btn--danger btn--sm" title="Delete cached game resources from browser storage">Clear Files</button>
             </div>
           </div>
 
           <div class="row-actions">
             <button type="button" id="btn-play-clouds" class="btn btn--primary btn--lg" style="flex: 1;">Play Clouds</button>
             <button type="button" id="btn-manage-worlds-splash" class="btn btn--secondary btn--lg">Manage Worlds</button>
-            <button type="button" id="btn-change-assets" class="btn btn--ghost btn--lg">Change Assets</button>
+            <button type="button" id="btn-change-assets" class="btn btn--ghost btn--lg">Change Files</button>
           </div>
         </div>
 
@@ -897,7 +897,7 @@ body.pointer-locked .hud-bar {
             </div>
             <p class="drop-zone__title">Drop your <code>resources.zip</code> here</p>
             <p class="drop-zone__hint">
-              Extracts <code>assets/</code>, <code>data/</code>, and <code>horizon-data.bin</code> once into OPFS. Zero server uploads.
+              Unpacks your textures, sounds, and data once on this device. Nothing is uploaded.
             </p>
             <input type="file" id="file-picker" accept=".zip,application/zip" hidden />
           </div>
@@ -913,7 +913,7 @@ body.pointer-locked .hud-bar {
           </div>
 
           <div id="drop-back-row" class="row-between" hidden>
-            <button type="button" id="btn-cancel-change-assets" class="btn btn--ghost btn--sm">Back to cached assets</button>
+            <button type="button" id="btn-cancel-change-assets" class="btn btn--ghost btn--sm">Back to saved files</button>
           </div>
         </div>
       </div>
@@ -923,7 +923,7 @@ body.pointer-locked .hud-bar {
   <!-- Pointer Status Floating Pill (Non-blocking: clicks pass through to canvas/UI) -->
   <div id="pointer-status-pill" class="pointer-status-pill" hidden>
     <span class="pointer-status-pill__icon">🖱️</span>
-    <span class="pointer-status-pill__text">Left-click viewport to capture mouse &bull; Press <strong>ESC</strong> to release</span>
+    <span class="pointer-status-pill__text">Click inside the game to lock your mouse &bull; Press <strong>ESC</strong> to free it</span>
   </div>
 
   <!-- Options & World Management Modal -->
@@ -932,7 +932,7 @@ body.pointer-locked .hud-bar {
       <div class="modal-header">
         <div>
           <h2 id="options-title" class="modal-title" style="font-size: var(--text-lg);">Options &amp; Worlds</h2>
-          <p class="modal-subtitle">Settings sync directly to <code>window.CloudsWeb.config</code>.</p>
+          <p class="modal-subtitle">Changes apply to your game right away.</p>
         </div>
         <button type="button" id="btn-close-options" class="btn btn--ghost btn--sm" aria-label="Close options">Close</button>
       </div>
@@ -941,7 +941,7 @@ body.pointer-locked .hud-bar {
         <div class="segmented" role="tablist" aria-label="Options sections">
           <button type="button" class="segmented__btn" role="tab" id="tab-general" aria-selected="true" aria-controls="panel-general">General</button>
           <button type="button" class="segmented__btn" role="tab" id="tab-worlds" aria-selected="false" aria-controls="panel-worlds">World Saves</button>
-          <button type="button" class="segmented__btn" role="tab" id="tab-storage" aria-selected="false" aria-controls="panel-storage">Storage &amp; Cache</button>
+          <button type="button" class="segmented__btn" role="tab" id="tab-storage" aria-selected="false" aria-controls="panel-storage">Storage &amp; Data</button>
         </div>
 
         <!-- General Settings Panel -->
@@ -985,29 +985,29 @@ body.pointer-locked .hud-bar {
         <!-- Storage Management Panel -->
         <section id="panel-storage" class="field-stack" role="tabpanel" aria-labelledby="tab-storage" hidden>
           <div class="surface-panel">
-            <div style="font-weight: 600; margin-bottom: var(--space-1);">Browser Storage Info</div>
-            <div class="modal-subtitle" id="storage-engine-info">Mode: OPFS</div>
-            <div class="modal-subtitle" id="storage-usage-info" style="margin-top: 4px;">Usage: Calculating...</div>
-            <div class="modal-subtitle" id="storage-counts-info" style="margin-top: 4px;">Assets: 0 files | Saves: 0 files</div>
+            <div style="font-weight: 600; margin-bottom: var(--space-1);">Device Storage</div>
+            <div class="modal-subtitle" id="storage-engine-info">Storage: Browser Files</div>
+            <div class="modal-subtitle" id="storage-usage-info" style="margin-top: 4px;">Space used: Calculating...</div>
+            <div class="modal-subtitle" id="storage-counts-info" style="margin-top: 4px;">Game files: 0 | World saves: 0</div>
           </div>
 
           <div class="field" style="margin-top: var(--space-3);">
-            <div style="font-weight: 500;">Purge Asset Cache</div>
+            <div style="font-weight: 500;">Clear Game Files</div>
             <p class="modal-subtitle" style="font-size: var(--text-xs); margin-top: 2px;">
               Deletes extracted Minecraft resources (textures, models, recipes, data) from browser storage. Your world saves will be preserved.
             </p>
             <div style="margin-top: var(--space-2);">
-              <button type="button" id="btn-purge-storage-assets" class="btn btn--danger">Delete Cached Resources</button>
+              <button type="button" id="btn-purge-storage-assets" class="btn btn--danger">Clear Game Files</button>
             </div>
           </div>
 
           <div class="field" style="margin-top: var(--space-3); border-top: 1px solid var(--border-subtle); padding-top: var(--space-3);">
-            <div style="font-weight: 500;">Factory Reset</div>
+            <div style="font-weight: 500;">Reset Everything</div>
             <p class="modal-subtitle" style="font-size: var(--text-xs); margin-top: 2px;">
               Completely wipes all browser storage for Clouds, including cached resources AND all world saves.
             </p>
             <div style="margin-top: var(--space-2);">
-              <button type="button" id="btn-purge-storage-all" class="btn btn--danger">Reset All Browser Data</button>
+              <button type="button" id="btn-purge-storage-all" class="btn btn--danger">Reset All Data</button>
             </div>
           </div>
         </section>
@@ -1020,7 +1020,7 @@ body.pointer-locked .hud-bar {
     <div class="modal-card">
       <div class="modal-header">
         <div>
-          <h2 id="error-title" class="modal-title" style="color: var(--color-error); font-size: var(--text-lg);">Engine Error</h2>
+          <h2 id="error-title" class="modal-title" style="color: var(--color-error); font-size: var(--text-lg);">Unable to Start</h2>
           <p id="error-message" class="modal-subtitle">An unexpected error occurred.</p>
         </div>
         <button type="button" id="btn-dismiss-error" class="btn btn--ghost btn--sm">Dismiss</button>
@@ -1031,7 +1031,7 @@ body.pointer-locked .hud-bar {
   <!-- Debug Log Drawer -->
   <aside id="log-drawer" class="log-drawer" hidden aria-label="Engine logs">
     <div class="log-drawer__header">
-      <span>Engine Console</span>
+      <span>Activity Log</span>
       <button type="button" id="btn-clear-logs" class="btn btn--ghost btn--sm">Clear</button>
     </div>
     <div id="log-body" class="log-drawer__body"></div>
@@ -1379,35 +1379,46 @@ body.pointer-locked .hud-bar {
     const coi = window.coiServiceWorker;
     if (window.crossOriginIsolated) {
       els.statusCoi.className = 'status-chip status-chip--success status-chip--hide-sm';
-      els.statusCoi.textContent = 'COI Active';
+      els.statusCoi.textContent = 'Fast Mode';
     } else if (coi && coi.state === 'reloading') {
       els.statusCoi.className = 'status-chip status-chip--warning status-chip--hide-sm';
-      els.statusCoi.textContent = 'Isolating…';
+      els.statusCoi.textContent = 'Preparing...';
     } else {
       els.statusCoi.className = 'status-chip status-chip--warning status-chip--hide-sm';
-      els.statusCoi.textContent = 'Single-Thread';
-      els.statusCoi.title = (coi && coi.reason) || 'SharedArrayBuffer unavailable without COOP/COEP';
+      els.statusCoi.textContent = 'Standard Mode';
+      els.statusCoi.title = (coi && coi.reason) || 'Multi-core mode is unavailable in this browser';
     }
   }
 
+  let webgpuReady = false;
+  let webgpuReason = 'Still checking graphics support. Try again in a moment.';
+
   async function checkWebGPU() {
     if (!('gpu' in navigator)) {
+      webgpuReady = false;
+      webgpuReason = 'Your browser does not support 3D graphics (WebGPU). Try Chrome, Edge, or Firefox Nightly.';
       els.statusWebGPU.className = 'status-chip status-chip--error status-chip--hide-sm';
-      els.statusWebGPU.textContent = 'No WebGPU';
+      els.statusWebGPU.textContent = 'Graphics Unsupported';
       return;
     }
     try {
       const adapter = await navigator.gpu.requestAdapter();
       if (adapter) {
+        webgpuReady = true;
+        webgpuReason = '';
         els.statusWebGPU.className = 'status-chip status-chip--success status-chip--hide-sm';
-        els.statusWebGPU.textContent = 'WebGPU Ready';
+        els.statusWebGPU.textContent = 'Graphics Ready';
       } else {
+        webgpuReady = false;
+        webgpuReason = 'No compatible graphics card was found. On Linux, enable WebGPU and Vulkan in chrome://flags and restart your browser.';
         els.statusWebGPU.className = 'status-chip status-chip--warning status-chip--hide-sm';
-        els.statusWebGPU.textContent = 'No GPU Adapter';
+        els.statusWebGPU.textContent = 'No Graphics Card';
       }
     } catch (_) {
+      webgpuReady = false;
+      webgpuReason = 'Graphics access is blocked by your browser settings.';
       els.statusWebGPU.className = 'status-chip status-chip--warning status-chip--hide-sm';
-      els.statusWebGPU.textContent = 'WebGPU Blocked';
+      els.statusWebGPU.textContent = 'Graphics Blocked';
     }
   }
 
@@ -1491,7 +1502,7 @@ body.pointer-locked .hud-bar {
     const total = assetFiles.length + dataFiles.length + (hasHorizon ? 1 : 0);
 
     if (hasHorizon || (assetFiles.length > 0 && dataFiles.length > 0)) {
-      els.cachedSummary.textContent = `${total.toLocaleString()} files stored in ${vfs.mode.toUpperCase()}`;
+      els.cachedSummary.textContent = `${total.toLocaleString()} game files saved on this device`;
       els.viewCachedReady.hidden = false;
       els.viewDropAssets.hidden = true;
       els.dropBackRow.hidden = false;
@@ -1590,7 +1601,7 @@ body.pointer-locked .hud-bar {
     if (worldMap.size === 0) {
       const empty = document.createElement('div');
       empty.className = 'surface-panel modal-subtitle';
-      empty.textContent = 'No worlds in saves/ yet. Create one above or import a .zip.';
+      empty.textContent = 'No worlds found yet. Create one above or import a .zip.';
       els.worldList.appendChild(empty);
       return;
     }
@@ -1712,7 +1723,7 @@ body.pointer-locked .hud-bar {
      ------------------------------------------------------------------------ */
   async function refreshStorageInfo() {
     if (els.storageEngineInfo) {
-      els.storageEngineInfo.textContent = `Mode: ${vfs.mode.toUpperCase()}`;
+      els.storageEngineInfo.textContent = `Storage: ${vfs.mode === 'opfs' ? 'Browser Files' : 'Browser Database'}`;
     }
     const hasHorizon = await vfs.fileExists('horizon-data.bin');
     const assetFiles = await vfs.listFiles('assets');
@@ -1721,7 +1732,7 @@ body.pointer-locked .hud-bar {
     const totalAssets = assetFiles.length + dataFiles.length + (hasHorizon ? 1 : 0);
 
     if (els.storageCountsInfo) {
-      els.storageCountsInfo.textContent = `Assets: ${totalAssets.toLocaleString()} files | Saves: ${worldFiles.length} files`;
+      els.storageCountsInfo.textContent = `Game files: ${totalAssets.toLocaleString()} | World saves: ${worldFiles.length}`;
     }
 
     if (navigator.storage && navigator.storage.estimate) {
@@ -1730,10 +1741,10 @@ body.pointer-locked .hud-bar {
         const usedMB = ((est.usage || 0) / (1024 * 1024)).toFixed(1);
         const quotaGB = ((est.quota || 0) / (1024 * 1024 * 1024)).toFixed(1);
         if (els.storageUsageInfo) {
-          els.storageUsageInfo.textContent = `Usage: ~${usedMB} MB used (of ~${quotaGB} GB quota)`;
+          els.storageUsageInfo.textContent = `Space used: ~${usedMB} MB (of ~${quotaGB} GB available)`;
         }
       } catch (_) {
-        if (els.storageUsageInfo) els.storageUsageInfo.textContent = 'Usage: Managed by browser';
+        if (els.storageUsageInfo) els.storageUsageInfo.textContent = 'Space used: Managed by browser';
       }
     }
   }
@@ -1764,14 +1775,17 @@ body.pointer-locked .hud-bar {
   }
 
   function launchEngine() {
+    if (!webgpuReady) {
+      window.CloudsWeb.onError(webgpuReason);
+      return;
+    }
     unlockAudio();
     resizeCanvas();
     els.onboardingModal.hidden = true;
     skyBackdrop.hidden = true;
     engineStarted = true;
-    appendLog('info', `Launching Clouds as "${config.username}" (RD ${config.renderDistance}, world "${config.worldName}").`);
+    appendLog('info', `Starting "${config.worldName}" as "${config.username}" (view distance ${config.renderDistance})...`);
     window.dispatchEvent(new CustomEvent('clouds:launch', { detail: { config, vfs } }));
-    // Do NOT auto-capture cursor on start; keep cursor visible and free until left click
     if (els.pointerStatusPill) {
       els.pointerStatusPill.hidden = false;
     }
@@ -1795,7 +1809,7 @@ body.pointer-locked .hud-bar {
         els.pointerStatusPill.hidden = false;
       }
       canvas.focus();
-      appendLog('info', 'Rust/Wasm engine signaled ready.');
+      appendLog('info', 'Game engine ready.');
     },
     onLog: (level, message) => {
       const fn = level === 'error' ? console.error : level === 'warn' ? console.warn : console.log;
@@ -1973,10 +1987,10 @@ body.pointer-locked .hud-bar {
 
     const mode = await vfs.init();
     els.statusStorage.className = 'status-chip status-chip--success';
-    els.statusStorage.textContent = mode === 'opfs' ? 'OPFS Ready' : 'IndexedDB Ready';
+    els.statusStorage.textContent = 'Saves Ready';
 
     await detectCachedAssets();
-    appendLog('info', `Clouds frontend initialized (${mode.toUpperCase()}).`);
+    appendLog('info', 'Clouds ready.');
   }
 
   init();
@@ -1993,7 +2007,7 @@ body.pointer-locked .hud-bar {
     if (!wasmInitPromise) {
       wasmInitPromise = initWasm('./clouds_bg.wasm').then(() => {
         wasmLoaded = true;
-        window.CloudsWeb.onLog('info', 'Clouds WebGPU WebAssembly runtime initialized.');
+        window.CloudsWeb.onLog('info', 'Game engine loaded.');
       }).catch(err => {
         window.CloudsWeb.onError(err);
       });
@@ -2007,12 +2021,12 @@ body.pointer-locked .hud-bar {
   window.addEventListener('clouds:launch', async (event) => {
     const { config, vfs } = event.detail;
     try {
-      window.CloudsWeb.onLog('info', 'Preparing virtual filesystem from OPFS...');
+      window.CloudsWeb.onLog('info', 'Loading saved game files...');
       await ensureWasm();
 
       // 1. Pass horizon-data.bin into Rust if present
       if (await vfs.fileExists('horizon-data.bin')) {
-        window.CloudsWeb.onLog('info', 'Loading horizon-data.bin container into WASM memory...');
+        window.CloudsWeb.onLog('info', 'Loading game data...');
         const bin = await vfs.readFile('horizon-data.bin');
         clouds_vfs_write('horizon-data.bin', bin);
       }
@@ -2043,7 +2057,7 @@ body.pointer-locked .hud-bar {
       }
 
       window.CloudsWeb.onEngineReady();
-      window.CloudsWeb.onLog('info', `Starting simulation for world "${config.worldName}"...`);
+      window.CloudsWeb.onLog('info', `Loading world "${config.worldName}"...`);
       clouds_start(config.username, config.worldName, config.renderDistance, config.creative);
     } catch (err) {
       window.CloudsWeb.onError(err);
