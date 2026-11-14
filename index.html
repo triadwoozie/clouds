@@ -175,6 +175,13 @@ html, body {
   justify-content: space-between;
   gap: var(--space-3);
   pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+body.pointer-locked .hud-bar {
+  opacity: 0;
+  transform: translateY(-100%);
+  pointer-events: none;
 }
 
 .hud-group {
@@ -1444,6 +1451,7 @@ html, body {
 
   document.addEventListener('pointerlockchange', () => {
     const locked = document.pointerLockElement === canvas;
+    document.body.classList.toggle('pointer-locked', locked);
     if (els.pointerStatusPill) {
       els.pointerStatusPill.hidden = locked || !engineStarted;
     }
