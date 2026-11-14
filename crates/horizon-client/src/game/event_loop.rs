@@ -24,7 +24,7 @@ pub(super) fn redraw_flow(frame_drawn: &mut bool, offscreen: bool, now: Instant)
 #[cfg(target_arch = "wasm32")]
 pub(super) fn redraw_flow(frame_drawn: &mut bool, _offscreen: bool, _now: Instant) -> ControlFlow {
     let _ = std::mem::take(frame_drawn);
-    ControlFlow::Poll
+    ControlFlow::Wait
 }
 
 pub(super) trait EventLoopCtl {

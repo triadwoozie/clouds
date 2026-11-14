@@ -254,17 +254,19 @@ pub async fn clouds_start(
     log::set_max_level(log::LevelFilter::Info);
 
     log("[Clouds] Requesting browser WebGPU adapter and device...");
-    let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
-        backends: wgpu::Backends::BROWSER_WEBGPU,
-        ..Default::default()
-    });
+    let mut descriptor = wgpu::InstanceDescriptor::new_without_display_handle();
+    descriptor.backends = wgpu::Backends::BROWSER_WEBGPU;
+    let instance = wgpu::Instance::new(descriptor);
+
     let adapter = instance
         .request_adapter(&wgpu::RequestAdapterOptions {
             power_preference: wgpu::PowerPreference::HighPerformance,
+            force_fallback_adapter: false,
+            compatible_surface: None,
             ..Default::default()
         })
         .await
-        .ok_or_else(|| JsValue::from_str("Browser WebGPU requestAdapter returned null"))?;
+        .map_err(|e| JsValue::from_str(&format!("Browser WebGPU requestAdapter failed: {e}")))?;
 
     let limits = adapter.limits();
     let features = adapter.features()

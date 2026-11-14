@@ -1,0 +1,37 @@
+/* tslint:disable */
+/* eslint-disable */
+export const memory: WebAssembly.Memory;
+export const __clouds_fs_free: (a: number, b: number) => void;
+export const __clouds_fs_read: (a: number, b: number, c: number) => number;
+export const __clouds_fs_readdir: (a: number, b: number, c: number) => number;
+export const __clouds_fs_stat: (a: number, b: number, c: number, d: number) => number;
+export const __clouds_fs_write: (a: number, b: number, c: number, d: number) => void;
+export const __clouds_now_ms: () => number;
+export const clouds_start: (a: number, b: number, c: number, d: number, e: number, f: number) => any;
+export const clouds_vfs_read: (a: number, b: number) => [number, number];
+export const clouds_vfs_write: (a: number, b: number, c: number, d: number) => [number, number];
+export const wasm_bindgen_393f27d5d35dd1ba___convert__closures_____invoke___js_sys_eb28580b882a1eda___Array__web_sys_a03ec40506ea4b57___features__gen_ResizeObserver__ResizeObserver______true_: (a: number, b: number, c: any, d: any) => void;
+export const wasm_bindgen_393f27d5d35dd1ba___convert__closures_____invoke___js_sys_eb28580b882a1eda___Function_fn_wasm_bindgen_393f27d5d35dd1ba___JsValue_____wasm_bindgen_393f27d5d35dd1ba___sys__Undefined___js_sys_eb28580b882a1eda___Function_fn_wasm_bindgen_393f27d5d35dd1ba___JsValue_____wasm_bindgen_393f27d5d35dd1ba___sys__Undefined_______true_: (a: number, b: number, c: any, d: any) => void;
+export const wasm_bindgen_393f27d5d35dd1ba___convert__closures_____invoke___wasm_bindgen_393f27d5d35dd1ba___JsValue__core_38742bd6726ee3e0___result__Result_____wasm_bindgen_393f27d5d35dd1ba___JsError___true_: (a: number, b: number, c: any) => [number, number];
+export const wasm_bindgen_393f27d5d35dd1ba___convert__closures_____invoke___wasm_bindgen_393f27d5d35dd1ba___sys__JsNullable_wgpu_d0b76334d909e266___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_38742bd6726ee3e0___result__Result_____wasm_bindgen_393f27d5d35dd1ba___JsError___true_: (a: number, b: number, c: any) => [number, number];
+export const wasm_bindgen_393f27d5d35dd1ba___convert__closures_____invoke___wasm_bindgen_393f27d5d35dd1ba___sys__JsNullable_wgpu_d0b76334d909e266___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_38742bd6726ee3e0___result__Result_____wasm_bindgen_393f27d5d35dd1ba___JsError___true__16: (a: number, b: number, c: any) => [number, number];
+export const wasm_bindgen_393f27d5d35dd1ba___convert__closures_____invoke___wasm_bindgen_393f27d5d35dd1ba___sys__JsNullable_wgpu_d0b76334d909e266___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_38742bd6726ee3e0___result__Result_____wasm_bindgen_393f27d5d35dd1ba___JsError___true__17: (a: number, b: number, c: any) => [number, number];
+export const wasm_bindgen_393f27d5d35dd1ba___convert__closures_____invoke___wasm_bindgen_393f27d5d35dd1ba___JsValue______true_: (a: number, b: number, c: any) => void;
+export const wasm_bindgen_393f27d5d35dd1ba___convert__closures_____invoke___wasm_bindgen_393f27d5d35dd1ba___JsValue______true__12: (a: number, b: number, c: any) => void;
+export const wasm_bindgen_393f27d5d35dd1ba___convert__closures_____invoke___wasm_bindgen_393f27d5d35dd1ba___JsValue______true__13: (a: number, b: number, c: any) => void;
+export const wasm_bindgen_393f27d5d35dd1ba___convert__closures_____invoke___wasm_bindgen_393f27d5d35dd1ba___JsValue______true__14: (a: number, b: number, c: any) => void;
+export const wasm_bindgen_393f27d5d35dd1ba___convert__closures_____invoke___wasm_bindgen_393f27d5d35dd1ba___JsValue______true__15: (a: number, b: number, c: any) => void;
+export const wasm_bindgen_393f27d5d35dd1ba___convert__closures_____invoke___wasm_bindgen_393f27d5d35dd1ba___JsValue______true__7: (a: number, b: number, c: any) => void;
+export const wasm_bindgen_393f27d5d35dd1ba___convert__closures_____invoke___wasm_bindgen_393f27d5d35dd1ba___JsValue______true__8: (a: number, b: number, c: any) => void;
+export const wasm_bindgen_393f27d5d35dd1ba___convert__closures_____invoke___wasm_bindgen_393f27d5d35dd1ba___JsValue______true__9: (a: number, b: number, c: any) => void;
+export const wasm_bindgen_393f27d5d35dd1ba___convert__closures_____invoke___wgpu_d0b76334d909e266___backend__webgpu__webgpu_sys__gen_GpuDeviceLostInfo__GpuDeviceLostInfo______true_: (a: number, b: number, c: any) => void;
+export const wasm_bindgen_393f27d5d35dd1ba___convert__closures_____invoke_______true_: (a: number, b: number) => void;
+export const __wbindgen_malloc: (a: number, b: number) => number;
+export const __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
+export const __externref_table_alloc: () => number;
+export const __wbindgen_externrefs: WebAssembly.Table;
+export const __wbindgen_exn_store: (a: number) => void;
+export const __wbindgen_destroy_closure: (a: number, b: number) => void;
+export const __wbindgen_free: (a: number, b: number, c: number) => void;
+export const __externref_table_dealloc: (a: number) => void;
+export const __wbindgen_start: () => void;
