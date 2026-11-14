@@ -1,0 +1,36 @@
+[package]
+name = "clouds-wasm"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+description = "Clouds WebGPU/Wasm runtime bridge"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+horizon-client = { path = "../horizon-client", default-features = false, features = ["audio"] }
+horizon-client-lib = { path = "../horizon-client-lib", default-features = false }
+horizon-client-core = { path = "../horizon-client-core" }
+horizon-client-render = { path = "../horizon-client-render" }
+horizon-core = { path = "../horizon-core" }
+horizon-threads = { path = "../horizon-threads" }
+horizon-hooks = { path = "../horizon-hooks" }
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+web-sys = { version = "0.3", features = [
+    "Window",
+    "Document",
+    "Element",
+    "HtmlCanvasElement",
+    "Performance",
+    "console"
+] }
+js-sys = "0.3"
+log = "0.4"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wgpu = { version = "30.0.1", default-features = false, features = ["std", "webgpu", "wgsl", "naga-ir", "fragile-send-sync-non-atomic-wasm"] }
+
+[lints]
+workspace = true

@@ -1,0 +1,2046 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Clouds — WebGPU Client</title>
+  <script src="coi-serviceworker.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+/* ==========================================================================
+   Clouds WebGPU Frontend — Astryx-aligned Design Tokens & Styles
+   Conventions: 4px spacing grid, concentric radii (r_inner = r_outer - gap),
+   tinted dark neutrals, alpha interaction overlays, semantic z-index tiers.
+   ========================================================================== */
+
+:root {
+  /* Spacing Scale (4px base grid, 2px optical half-step) */
+  --space-0-5: 2px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+
+  /* Concentric Radius Scale */
+  --radius-inner: 4px;
+  --radius-element: 8px;
+  --radius-container: 12px;
+  --radius-modal: 16px;
+  --radius-page: 28px;
+  --radius-full: 9999px;
+
+  /* Control Heights (Rhythm: sm 28 / md 32 / lg 36) */
+  --control-sm: 28px;
+  --control-md: 32px;
+  --control-lg: 36px;
+
+  /* Typography Scale (Base 14px, ~1.2 geometric ratio) */
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --text-xs: 12px;
+  --text-sm: 14px;
+  --text-md: 16px;
+  --text-lg: 20px;
+  --text-xl: 24px;
+  --text-2xl: 28px;
+
+  /* Tinted Dark Neutrals (Minecraft Deepslate & Stone palette) */
+  --color-bg-body: #111315;
+  --color-bg-surface: #1a1d21;
+  --color-bg-elevated: #22262b;
+  --color-bg-muted: #262b31;
+  --color-bg-inverted: #edeae4;
+
+  /* Text Tokens (WCAG AA >= 4.5:1) */
+  --color-text-primary: #f2efe9;
+  --color-text-secondary: #b5b2a8;
+  --color-text-muted: #848177;
+  --color-text-disabled: #595750;
+  --color-text-on-accent: #091808;
+  --color-text-on-inverted: #111315;
+
+  /* Brand Accent (Minecraft Grass / Emerald Green) */
+  --color-accent: #52b749;
+  --color-accent-hover: #66cc5c;
+  --color-accent-muted: rgba(82, 183, 73, 0.16);
+
+  /* Alpha Interaction Overlays */
+  --color-overlay-hover: rgba(242, 239, 233, 0.08);
+  --color-overlay-pressed: rgba(242, 239, 233, 0.14);
+  --color-track: rgba(242, 239, 233, 0.12);
+
+  /* Borders */
+  --color-border-subtle: rgba(242, 239, 233, 0.09);
+  --color-border-default: rgba(242, 239, 233, 0.15);
+  --color-border-emphasized: rgba(242, 239, 233, 0.28);
+
+  /* Semantic Status Tokens (Emerald, Gold, Redstone) */
+  --color-success: #55d655;
+  --color-success-muted: rgba(85, 214, 85, 0.15);
+  --color-warning: #ffaa00;
+  --color-warning-muted: rgba(255, 170, 0, 0.15);
+  --color-error: #ff5555;
+  --color-error-muted: rgba(255, 85, 85, 0.15);
+
+  /* Shadows & Inset Rings */
+  --shadow-low: 0 2px 8px rgba(3, 6, 12, 0.36);
+  --shadow-med: 0 8px 24px rgba(3, 6, 12, 0.48);
+  --shadow-high: 0 20px 48px rgba(3, 6, 12, 0.64);
+  --shadow-inset-hover: inset 0 0 0 1px var(--color-border-emphasized);
+  --shadow-inset-focus: inset 0 0 0 1px var(--color-accent);
+
+  /* Semantic Z-Index Tiers */
+  --z-base: 0;
+  --z-hud: 10;
+  --z-sticky: 20;
+  --z-overlay: 30;
+  --z-modal: 40;
+  --z-toast: 50;
+
+  /* Motion */
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --duration-fast: 175ms;
+  --duration-med: 320ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition-duration: 0s !important;
+    animation-duration: 0s !important;
+  }
+}
+
+/* Reset & Base */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background-color: var(--color-bg-body);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+/* Fullscreen WebGPU Canvas */
+#clouds-canvas {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  outline: none;
+  z-index: var(--z-base);
+  background: radial-gradient(circle at 50% 25%, #1c2d3b 0%, #111315 72%);
+  cursor: crosshair;
+}
+
+/* Atmospheric Cloud Backdrop (visible behind onboarding / pause) */
+.sky-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 65% 45% at 20% 15%, rgba(82, 183, 73, 0.12), transparent 70%),
+    radial-gradient(ellipse 55% 40% at 80% 80%, rgba(92, 179, 255, 0.09), transparent 70%);
+}
+
+/* Top HUD Bar */
+.hud-bar {
+  position: fixed;
+  top: var(--space-4);
+  left: var(--space-4);
+  right: var(--space-4);
+  z-index: var(--z-hud);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  pointer-events: none;
+}
+
+.hud-group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1);
+  background: rgba(26, 29, 33, 0.86);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-container); /* 12px outer, 4px pad -> 8px inner */
+  box-shadow: var(--shadow-low);
+  pointer-events: auto;
+}
+
+.brand-pill {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-3);
+  height: var(--control-md);
+  font-weight: 600;
+  font-size: var(--text-sm);
+  color: var(--color-text-primary);
+}
+
+.brand-icon {
+  color: var(--color-accent);
+  flex-shrink: 0;
+}
+
+/* Status Chips (Color + Icon, Astryx Muted Style) */
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  height: var(--control-sm);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-element);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.status-chip--success {
+  background: var(--color-success-muted);
+  color: var(--color-success);
+  border-color: rgba(61, 214, 140, 0.24);
+}
+
+.status-chip--warning {
+  background: var(--color-warning-muted);
+  color: var(--color-warning);
+  border-color: rgba(245, 185, 66, 0.24);
+}
+
+.status-chip--error {
+  background: var(--color-error-muted);
+  color: var(--color-error);
+  border-color: rgba(248, 113, 113, 0.24);
+}
+
+.status-chip--neutral {
+  background: var(--color-bg-muted);
+  color: var(--color-text-secondary);
+  border-color: var(--color-border-subtle);
+}
+
+/* Astryx-aligned Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  height: var(--control-md);
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-element);
+  border: 1px solid transparent;
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  cursor: pointer;
+  user-select: none;
+  transition:
+    background-color var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard),
+    transform var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard);
+}
+
+.btn--sm {
+  height: var(--control-sm);
+  padding: 0 var(--space-2);
+  font-size: var(--text-xs);
+}
+
+.btn--lg {
+  height: var(--control-lg);
+  padding: 0 var(--space-4);
+}
+
+.btn--primary {
+  background-color: var(--color-accent);
+  color: var(--color-text-on-accent);
+  font-weight: 600;
+}
+
+.btn--primary:hover:not(:disabled) {
+  background-color: var(--color-accent-hover);
+}
+
+.btn--secondary {
+  background-color: var(--color-bg-muted);
+  color: var(--color-text-primary);
+  border-color: var(--color-border-default);
+}
+
+.btn--secondary:hover:not(:disabled) {
+  background-color: var(--color-bg-elevated);
+  border-color: var(--color-border-emphasized);
+}
+
+.btn--ghost {
+  background-color: transparent;
+  color: var(--color-text-secondary);
+}
+
+.btn--ghost:hover:not(:disabled) {
+  background-color: var(--color-overlay-hover);
+  color: var(--color-text-primary);
+}
+
+.btn--danger {
+  background-color: var(--color-error-muted);
+  color: var(--color-error);
+  border-color: rgba(248, 113, 113, 0.28);
+}
+
+.btn--danger:hover:not(:disabled) {
+  background-color: rgba(248, 113, 113, 0.22);
+}
+
+.btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.btn:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 3px;
+}
+
+.btn:disabled {
+  color: var(--color-text-disabled);
+  background-color: var(--color-bg-muted);
+  border-color: var(--color-border-subtle);
+  cursor: not-allowed;
+}
+
+/* Modals & Overlays */
+.overlay-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+  background: rgba(8, 12, 19, 0.72);
+  backdrop-filter: blur(10px);
+}
+
+.overlay-backdrop--hud {
+  z-index: var(--z-overlay);
+}
+
+/* Floating Non-Blocking Pointer Status Pill */
+.pointer-status-pill {
+  position: fixed;
+  bottom: 2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--z-hud);
+  pointer-events: none; /* Crucial: clicks pass straight through to canvas/UI! */
+  user-select: none;
+  background: rgba(14, 21, 37, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(8px);
+  border-radius: var(--radius-full);
+  padding: 0.6rem 1.25rem;
+  color: #e2e8f0;
+  font-size: var(--text-sm);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  white-space: nowrap;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.pointer-status-pill strong {
+  color: var(--color-brand);
+}
+
+.modal-card {
+  width: 100%;
+  max-width: 540px;
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-modal); /* 16px outer */
+  padding: var(--space-2); /* 8px gap -> inner cards use 8px concentric radius */
+  box-shadow: var(--shadow-high);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.modal-card--wide {
+  max-width: 640px;
+}
+
+.modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-4) var(--space-2);
+}
+
+.modal-title {
+  margin: 0;
+  font-size: var(--text-xl);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+}
+
+.modal-subtitle {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-2) var(--space-4) var(--space-4);
+}
+
+/* Surface Panels (Concentric inside 16px modal with 8px pad -> 8px radius) */
+.surface-panel {
+  background: var(--color-bg-muted);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-element);
+  padding: var(--space-4);
+}
+
+/* Drag-and-Drop Zone */
+.drop-zone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: var(--space-3);
+  padding: var(--space-8) var(--space-6);
+  background: var(--color-bg-muted);
+  border: 1.5px dashed var(--color-border-default);
+  border-radius: var(--radius-element);
+  cursor: pointer;
+  transition:
+    background-color var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard);
+}
+
+.drop-zone:hover,
+.drop-zone.is-dragover {
+  background: var(--color-accent-muted);
+  border-color: var(--color-accent);
+}
+
+.drop-zone__icon {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-inner);
+  background: var(--color-bg-elevated);
+  color: var(--color-accent);
+  border: 1px solid var(--color-border-subtle);
+}
+
+.drop-zone__title {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: 600;
+}
+
+.drop-zone__hint {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+  max-width: 42ch;
+}
+
+/* Progress Bar */
+.progress-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.progress-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+}
+
+.progress-track {
+  width: 100%;
+  height: 8px;
+  background: var(--color-track);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  width: 0%;
+  background: var(--color-accent);
+  border-radius: var(--radius-full);
+  transition: width 120ms linear;
+}
+
+/* Segmented Tabs (Astryx Surface Style) */
+.segmented {
+  display: inline-flex;
+  padding: var(--space-1);
+  background: var(--color-bg-body);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-container);
+  gap: var(--space-1);
+}
+
+.segmented__btn {
+  flex: 1;
+  height: var(--control-sm);
+  padding: 0 var(--space-3);
+  border: none;
+  border-radius: var(--radius-element);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background-color var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard);
+}
+
+.segmented__btn[aria-selected="true"] {
+  background: var(--color-bg-elevated);
+  color: var(--color-text-primary);
+  box-shadow: var(--shadow-low);
+}
+
+/* Form Fields (Astryx Ring Style) */
+.field-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.field__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.field__label {
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--color-text-secondary);
+}
+
+.field__value {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--color-accent);
+}
+
+.input-text {
+  height: var(--control-lg);
+  padding: 0 var(--space-3);
+  background: var(--color-bg-body);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-element);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  outline: none;
+  transition: border-color var(--duration-fast) var(--ease-standard), box-shadow var(--duration-fast) var(--ease-standard);
+}
+
+.input-text:hover {
+  border-color: var(--color-border-emphasized);
+  box-shadow: var(--shadow-inset-hover);
+}
+
+.input-text:focus {
+  border-color: var(--color-accent);
+  box-shadow: var(--shadow-inset-focus);
+}
+
+.input-range {
+  width: 100%;
+  accent-color: var(--color-accent);
+  cursor: pointer;
+}
+
+.toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  background: var(--color-bg-muted);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-element);
+}
+
+.toggle-switch {
+  position: relative;
+  width: 40px;
+  height: 22px;
+  border-radius: var(--radius-full);
+  background: var(--color-track);
+  border: 1px solid var(--color-border-default);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background-color var(--duration-fast) var(--ease-standard);
+}
+
+.toggle-switch::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: var(--radius-full);
+  background: var(--color-text-primary);
+  transition: transform var(--duration-fast) var(--ease-standard);
+}
+
+.toggle-switch[aria-checked="true"] {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.toggle-switch[aria-checked="true"]::after {
+  background: var(--color-text-on-accent);
+  transform: translateX(18px);
+}
+
+/* World List */
+.world-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.world-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-bg-muted);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-element);
+}
+
+.world-row.is-active {
+  border-color: var(--color-accent);
+  box-shadow: var(--shadow-inset-focus);
+}
+
+.world-row__info {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.world-row__name {
+  font-weight: 600;
+  font-size: var(--text-sm);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.world-row__meta {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+}
+
+.world-row__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex-shrink: 0;
+}
+
+/* Pause / Pointer-Lock Resume Card */
+.resume-card {
+  text-align: center;
+  align-items: center;
+  padding: var(--space-6);
+  max-width: 420px;
+}
+
+.resume-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-2);
+  width: 100%;
+  margin-top: var(--space-2);
+}
+
+/* Debug Log Drawer */
+.log-drawer {
+  position: fixed;
+  bottom: var(--space-4);
+  right: var(--space-4);
+  width: min(520px, calc(100vw - 32px));
+  max-height: 240px;
+  z-index: var(--z-sticky);
+  background: rgba(17, 19, 21, 0.94);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-container);
+  box-shadow: var(--shadow-med);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.log-drawer__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--color-border-subtle);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.log-drawer__body {
+  padding: var(--space-2) var(--space-3);
+  overflow-y: auto;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.log-line--info { color: var(--color-text-secondary); }
+.log-line--warn { color: var(--color-warning); }
+.log-line--error { color: var(--color-error); }
+
+/* Toast Notification (Astryx Temporal Overlay Style) */
+.toast-container {
+  position: fixed;
+  bottom: var(--space-4);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--z-toast);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  pointer-events: none;
+}
+
+.toast {
+  padding: var(--space-2) var(--space-4);
+  background: var(--color-bg-inverted);
+  color: var(--color-text-on-inverted);
+  border-radius: var(--radius-element);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  box-shadow: var(--shadow-med);
+}
+
+.row-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+@media (max-width: 600px) {
+  .hud-bar {
+    flex-wrap: wrap;
+  }
+  .status-chip--hide-sm {
+    display: none;
+  }
+}
+
+</style>
+  <!-- Fast client-side zip/unzip for resources.zip & world exports (local offline) -->
+  <script src="./fflate.js"></script>
+</head>
+<body>
+  <canvas id="clouds-canvas" tabindex="1" aria-label="Clouds 3D WebGPU viewport"></canvas>
+  <div class="sky-backdrop" id="sky-backdrop" aria-hidden="true"></div>
+
+  <!-- Top HUD Bar -->
+  <header class="hud-bar">
+    <div class="hud-group">
+      <div class="brand-pill">
+        <svg class="brand-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>
+        </svg>
+        <span>Clouds</span>
+      </div>
+      <span id="status-coi" class="status-chip status-chip--neutral status-chip--hide-sm" title="Cross-Origin Isolation (SharedArrayBuffer)">
+        Checking COI…
+      </span>
+      <span id="status-webgpu" class="status-chip status-chip--neutral status-chip--hide-sm" title="WebGPU Adapter Status">
+        Checking WebGPU…
+      </span>
+      <span id="status-storage" class="status-chip status-chip--neutral" title="Local Asset Storage">
+        Storage…
+      </span>
+    </div>
+
+    <div class="hud-group">
+      <button type="button" id="btn-open-options" class="btn btn--ghost btn--sm">Options</button>
+      <button type="button" id="btn-toggle-logs" class="btn btn--ghost btn--sm">Logs</button>
+      <button type="button" id="btn-fullscreen" class="btn btn--secondary btn--sm" aria-label="Toggle fullscreen">Fullscreen</button>
+    </div>
+  </header>
+
+  <!-- Onboarding / Cached Asset Splash Modal -->
+  <div id="onboarding-modal" class="overlay-backdrop" role="dialog" aria-modal="true" aria-labelledby="onboarding-title">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div>
+          <h1 id="onboarding-title" class="modal-title">Clouds 26.3</h1>
+          <p class="modal-subtitle">Static Rust/Wasm WebGPU client. Your assets stay local in browser storage.</p>
+        </div>
+      </div>
+
+      <div class="modal-body">
+        <!-- View A: Ready (Cached assets found in OPFS / IndexedDB) -->
+        <div id="view-cached-ready" class="field-stack" hidden>
+          <div class="surface-panel row-between">
+            <div>
+              <div style="font-weight: 600;">Local resources ready</div>
+              <div id="cached-summary" class="modal-subtitle" style="margin-top: 2px;">Detected assets in local storage</div>
+            </div>
+            <div style="display: flex; gap: var(--space-2); align-items: center;">
+              <span class="status-chip status-chip--success">Cached</span>
+              <button type="button" id="btn-purge-assets" class="btn btn--danger btn--sm" title="Delete cached game resources from browser storage">Purge Cache</button>
+            </div>
+          </div>
+
+          <div class="row-actions">
+            <button type="button" id="btn-play-clouds" class="btn btn--primary btn--lg" style="flex: 1;">Play Clouds</button>
+            <button type="button" id="btn-manage-worlds-splash" class="btn btn--secondary btn--lg">Manage Worlds</button>
+            <button type="button" id="btn-change-assets" class="btn btn--ghost btn--lg">Change Assets</button>
+          </div>
+        </div>
+
+        <!-- View B: Drop Zone (No assets yet or user clicked Change Assets) -->
+        <div id="view-drop-assets" class="field-stack">
+          <div id="drop-zone" class="drop-zone" tabindex="0" role="button" aria-label="Drop resources.zip or click to browse">
+            <div class="drop-zone__icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="17 8 12 3 7 8"/>
+                <line x1="12" y1="3" x2="12" y2="15"/>
+              </svg>
+            </div>
+            <p class="drop-zone__title">Drop your <code>resources.zip</code> here</p>
+            <p class="drop-zone__hint">
+              Extracts <code>assets/</code>, <code>data/</code>, and <code>horizon-data.bin</code> once into OPFS. Zero server uploads.
+            </p>
+            <input type="file" id="file-picker" accept=".zip,application/zip" hidden />
+          </div>
+
+          <div id="ingest-progress" class="progress-wrap" hidden>
+            <div class="progress-meta">
+              <span id="progress-label">Preparing…</span>
+              <span id="progress-pct" class="field__value">0%</span>
+            </div>
+            <div class="progress-track">
+              <div id="progress-fill" class="progress-fill"></div>
+            </div>
+          </div>
+
+          <div id="drop-back-row" class="row-between" hidden>
+            <button type="button" id="btn-cancel-change-assets" class="btn btn--ghost btn--sm">Back to cached assets</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pointer Status Floating Pill (Non-blocking: clicks pass through to canvas/UI) -->
+  <div id="pointer-status-pill" class="pointer-status-pill" hidden>
+    <span class="pointer-status-pill__icon">🖱️</span>
+    <span class="pointer-status-pill__text">Left-click viewport to capture mouse &bull; Press <strong>ESC</strong> to release</span>
+  </div>
+
+  <!-- Options & World Management Modal -->
+  <div id="options-modal" class="overlay-backdrop" hidden role="dialog" aria-modal="true" aria-labelledby="options-title">
+    <div class="modal-card modal-card--wide">
+      <div class="modal-header">
+        <div>
+          <h2 id="options-title" class="modal-title" style="font-size: var(--text-lg);">Options &amp; Worlds</h2>
+          <p class="modal-subtitle">Settings sync directly to <code>window.CloudsWeb.config</code>.</p>
+        </div>
+        <button type="button" id="btn-close-options" class="btn btn--ghost btn--sm" aria-label="Close options">Close</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="segmented" role="tablist" aria-label="Options sections">
+          <button type="button" class="segmented__btn" role="tab" id="tab-general" aria-selected="true" aria-controls="panel-general">General</button>
+          <button type="button" class="segmented__btn" role="tab" id="tab-worlds" aria-selected="false" aria-controls="panel-worlds">World Saves</button>
+          <button type="button" class="segmented__btn" role="tab" id="tab-storage" aria-selected="false" aria-controls="panel-storage">Storage &amp; Cache</button>
+        </div>
+
+        <!-- General Settings Panel -->
+        <section id="panel-general" class="field-stack" role="tabpanel" aria-labelledby="tab-general">
+          <div class="field">
+            <label for="input-username" class="field__label">Player Name</label>
+            <input type="text" id="input-username" class="input-text" maxlength="24" placeholder="CloudWalker" />
+          </div>
+
+          <div class="field">
+            <div class="field__header">
+              <label for="input-render-distance" class="field__label">Render Distance</label>
+              <span id="render-distance-val" class="field__value">12 chunks</span>
+            </div>
+            <input type="range" id="input-render-distance" class="input-range" min="2" max="32" step="1" value="12" />
+          </div>
+
+          <div class="toggle-row">
+            <div>
+              <div style="font-weight: 500;">Creative Mode</div>
+              <div class="modal-subtitle" style="font-size: var(--text-xs);">Unlimited blocks and flight enabled</div>
+            </div>
+            <button type="button" id="toggle-creative" class="toggle-switch" role="switch" aria-checked="false" aria-label="Toggle Creative Mode"></button>
+          </div>
+        </section>
+
+        <!-- Worlds Management Panel -->
+        <section id="panel-worlds" class="field-stack" role="tabpanel" aria-labelledby="tab-worlds" hidden>
+          <div class="row-between">
+            <div class="row-actions" style="flex: 1;">
+              <input type="text" id="input-new-world" class="input-text" placeholder="New world name…" style="flex: 1; min-width: 140px;" />
+              <button type="button" id="btn-create-world" class="btn btn--primary btn--lg">Create</button>
+            </div>
+            <button type="button" id="btn-import-world" class="btn btn--secondary btn--lg">Import .zip</button>
+            <input type="file" id="world-import-picker" accept=".zip,application/zip" hidden />
+          </div>
+
+          <div id="world-list" class="world-list" aria-live="polite"></div>
+        </section>
+
+        <!-- Storage Management Panel -->
+        <section id="panel-storage" class="field-stack" role="tabpanel" aria-labelledby="tab-storage" hidden>
+          <div class="surface-panel">
+            <div style="font-weight: 600; margin-bottom: var(--space-1);">Browser Storage Info</div>
+            <div class="modal-subtitle" id="storage-engine-info">Mode: OPFS</div>
+            <div class="modal-subtitle" id="storage-usage-info" style="margin-top: 4px;">Usage: Calculating...</div>
+            <div class="modal-subtitle" id="storage-counts-info" style="margin-top: 4px;">Assets: 0 files | Saves: 0 files</div>
+          </div>
+
+          <div class="field" style="margin-top: var(--space-3);">
+            <div style="font-weight: 500;">Purge Asset Cache</div>
+            <p class="modal-subtitle" style="font-size: var(--text-xs); margin-top: 2px;">
+              Deletes extracted Minecraft resources (textures, models, recipes, data) from browser storage. Your world saves will be preserved.
+            </p>
+            <div style="margin-top: var(--space-2);">
+              <button type="button" id="btn-purge-storage-assets" class="btn btn--danger">Delete Cached Resources</button>
+            </div>
+          </div>
+
+          <div class="field" style="margin-top: var(--space-3); border-top: 1px solid var(--border-subtle); padding-top: var(--space-3);">
+            <div style="font-weight: 500;">Factory Reset</div>
+            <p class="modal-subtitle" style="font-size: var(--text-xs); margin-top: 2px;">
+              Completely wipes all browser storage for Clouds, including cached resources AND all world saves.
+            </p>
+            <div style="margin-top: var(--space-2);">
+              <button type="button" id="btn-purge-storage-all" class="btn btn--danger">Reset All Browser Data</button>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <!-- Error Overlay -->
+  <div id="error-modal" class="overlay-backdrop" hidden role="alertdialog" aria-modal="true" aria-labelledby="error-title">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div>
+          <h2 id="error-title" class="modal-title" style="color: var(--color-error); font-size: var(--text-lg);">Engine Error</h2>
+          <p id="error-message" class="modal-subtitle">An unexpected error occurred.</p>
+        </div>
+        <button type="button" id="btn-dismiss-error" class="btn btn--ghost btn--sm">Dismiss</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Debug Log Drawer -->
+  <aside id="log-drawer" class="log-drawer" hidden aria-label="Engine logs">
+    <div class="log-drawer__header">
+      <span>Engine Console</span>
+      <button type="button" id="btn-clear-logs" class="btn btn--ghost btn--sm">Clear</button>
+    </div>
+    <div id="log-body" class="log-drawer__body"></div>
+  </aside>
+
+  <div id="toast-container" class="toast-container" aria-live="polite"></div>
+
+  <script>
+/* ==========================================================================
+   clouds.js — OPFS/IDB VFS, Zip Ingest, Pointer Lock, Web Audio, & CloudsWeb
+   ========================================================================== */
+(() => {
+  'use strict';
+
+  const CONFIG_KEY = 'clouds_config_v1';
+  const DB_NAME = 'clouds_vfs_fallback';
+  const DB_STORE = 'files';
+
+  /* ------------------------------------------------------------------------
+     1. Persistent Virtual Filesystem (OPFS primary, IndexedDB fallback)
+     ------------------------------------------------------------------------ */
+  class VirtualFS {
+    constructor() {
+      this.mode = 'detecting';
+      this.root = null;
+      this.db = null;
+    }
+
+    async init() {
+      if (navigator.storage && typeof navigator.storage.getDirectory === 'function') {
+        try {
+          this.root = await navigator.storage.getDirectory();
+          // Probe write/delete capability (some sandboxed iframes block OPFS)
+          const probe = await this.root.getFileHandle('.clouds_probe', { create: true });
+          const writable = await probe.createWritable();
+          await writable.close();
+          await this.root.removeEntry('.clouds_probe');
+          this.mode = 'opfs';
+          return this.mode;
+        } catch (err) {
+          console.warn('[Clouds VFS] OPFS unavailable, falling back to IndexedDB:', err);
+        }
+      }
+      await this._initIDB();
+      this.mode = 'indexeddb';
+      return this.mode;
+    }
+
+    _initIDB() {
+      return new Promise((resolve, reject) => {
+        const req = indexedDB.open(DB_NAME, 1);
+        req.onupgradeneeded = () => {
+          const db = req.result;
+          if (!db.objectStoreNames.contains(DB_STORE)) {
+            db.createObjectStore(DB_STORE);
+          }
+        };
+        req.onsuccess = () => {
+          this.db = req.result;
+          resolve();
+        };
+        req.onerror = () => reject(req.error);
+      });
+    }
+
+    _normPath(path) {
+      return String(path || '')
+        .replace(/\\/g, '/')
+        .replace(/^\/+/, '')
+        .replace(/\/+/g, '/');
+    }
+
+    async _getOPFSDir(parts, create = false) {
+      let dir = this.root;
+      for (const part of parts) {
+        if (!part) continue;
+        dir = await dir.getDirectoryHandle(part, { create });
+      }
+      return dir;
+    }
+
+    async writeFile(rawPath, data) {
+      const path = this._normPath(rawPath);
+      if (!path) throw new Error('Invalid file path');
+      const bytes = data instanceof Uint8Array ? data : new Uint8Array(data);
+
+      if (this.mode === 'opfs') {
+        const parts = path.split('/');
+        const fileName = parts.pop();
+        const dir = await this._getOPFSDir(parts, true);
+        const handle = await dir.getFileHandle(fileName, { create: true });
+        const writable = await handle.createWritable();
+        await writable.write(bytes);
+        await writable.close();
+        return;
+      }
+
+      return new Promise((resolve, reject) => {
+        const tx = this.db.transaction(DB_STORE, 'readwrite');
+        tx.objectStore(DB_STORE).put(bytes, path);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      });
+    }
+
+    async readFile(rawPath) {
+      const path = this._normPath(rawPath);
+      if (this.mode === 'opfs') {
+        const parts = path.split('/');
+        const fileName = parts.pop();
+        const dir = await this._getOPFSDir(parts, false);
+        const handle = await dir.getFileHandle(fileName, { create: false });
+        const file = await handle.getFile();
+        return new Uint8Array(await file.arrayBuffer());
+      }
+
+      return new Promise((resolve, reject) => {
+        const tx = this.db.transaction(DB_STORE, 'readonly');
+        const req = tx.objectStore(DB_STORE).get(path);
+        req.onsuccess = () => {
+          if (req.result === undefined) {
+            reject(new Error(`File not found: ${path}`));
+          } else {
+            resolve(req.result instanceof Uint8Array ? req.result : new Uint8Array(req.result));
+          }
+        };
+        req.onerror = () => reject(req.error);
+      });
+    }
+
+    async fileExists(rawPath) {
+      const path = this._normPath(rawPath);
+      if (!path) return false;
+      if (this.mode === 'opfs') {
+        try {
+          const parts = path.split('/');
+          const fileName = parts.pop();
+          const dir = await this._getOPFSDir(parts, false);
+          await dir.getFileHandle(fileName, { create: false });
+          return true;
+        } catch (_) {
+          return false;
+        }
+      }
+
+      return new Promise((resolve) => {
+        const tx = this.db.transaction(DB_STORE, 'readonly');
+        const req = tx.objectStore(DB_STORE).getKey(path);
+        req.onsuccess = () => resolve(req.result !== undefined);
+        req.onerror = () => resolve(false);
+      });
+    }
+
+    async listFiles(rawDir = '') {
+      const prefix = this._normPath(rawDir).replace(/\/$/, '');
+      if (this.mode === 'opfs') {
+        const results = [];
+        let startDir;
+        try {
+          startDir = prefix ? await this._getOPFSDir(prefix.split('/'), false) : this.root;
+        } catch (_) {
+          return [];
+        }
+        const walk = async (dirHandle, currentPrefix) => {
+          for await (const [name, handle] of dirHandle.entries()) {
+            const full = currentPrefix ? `${currentPrefix}/${name}` : name;
+            if (handle.kind === 'file') {
+              results.push(full);
+            } else if (handle.kind === 'directory') {
+              await walk(handle, full);
+            }
+          }
+        };
+        await walk(startDir, prefix);
+        return results.sort();
+      }
+
+      return new Promise((resolve, reject) => {
+        const tx = this.db.transaction(DB_STORE, 'readonly');
+        const req = tx.objectStore(DB_STORE).getAllKeys();
+        req.onsuccess = () => {
+          const keys = req.result.map(String);
+          const filtered = prefix
+            ? keys.filter((k) => k === prefix || k.startsWith(`${prefix}/`))
+            : keys;
+          resolve(filtered.sort());
+        };
+        req.onerror = () => reject(req.error);
+      });
+    }
+
+    async deletePath(rawPath) {
+      const path = this._normPath(rawPath).replace(/\/$/, '');
+      if (!path) return;
+
+      if (this.mode === 'opfs') {
+        const parts = path.split('/');
+        const target = parts.pop();
+        try {
+          const dir = await this._getOPFSDir(parts, false);
+          await dir.removeEntry(target, { recursive: true });
+        } catch (_) {}
+        return;
+      }
+
+      const keys = await this.listFiles(path);
+      return new Promise((resolve, reject) => {
+        const tx = this.db.transaction(DB_STORE, 'readwrite');
+        const store = tx.objectStore(DB_STORE);
+        keys.forEach((k) => store.delete(k));
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      });
+    }
+
+    async clearAssets() {
+      const all = await this.listFiles('');
+      for (const p of all) {
+        if (!p.startsWith('saves/')) {
+          await this.deletePath(p);
+        }
+      }
+    }
+
+    async clearAll() {
+      if (this.mode === 'opfs') {
+        for await (const [name, handle] of this.root.entries()) {
+          await this.root.removeEntry(name, { recursive: true });
+        }
+        return;
+      }
+      return new Promise((resolve, reject) => {
+        const tx = this.db.transaction(DB_STORE, 'readwrite');
+        tx.objectStore(DB_STORE).clear();
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      });
+    }
+  }
+
+  /* ------------------------------------------------------------------------
+     2. Application State & DOM References
+     ------------------------------------------------------------------------ */
+  const vfs = new VirtualFS();
+  const canvas = document.getElementById('clouds-canvas');
+  const skyBackdrop = document.getElementById('sky-backdrop');
+
+  const els = {
+    statusCoi: document.getElementById('status-coi'),
+    statusWebGPU: document.getElementById('status-webgpu'),
+    statusStorage: document.getElementById('status-storage'),
+    onboardingModal: document.getElementById('onboarding-modal'),
+    viewCachedReady: document.getElementById('view-cached-ready'),
+    viewDropAssets: document.getElementById('view-drop-assets'),
+    cachedSummary: document.getElementById('cached-summary'),
+    dropZone: document.getElementById('drop-zone'),
+    filePicker: document.getElementById('file-picker'),
+    ingestProgress: document.getElementById('ingest-progress'),
+    progressLabel: document.getElementById('progress-label'),
+    progressPct: document.getElementById('progress-pct'),
+    progressFill: document.getElementById('progress-fill'),
+    dropBackRow: document.getElementById('drop-back-row'),
+    pointerStatusPill: document.getElementById('pointer-status-pill'),
+    optionsModal: document.getElementById('options-modal'),
+    errorModal: document.getElementById('error-modal'),
+    errorMessage: document.getElementById('error-message'),
+    logDrawer: document.getElementById('log-drawer'),
+    logBody: document.getElementById('log-body'),
+    toastContainer: document.getElementById('toast-container'),
+    inputUsername: document.getElementById('input-username'),
+    inputRenderDistance: document.getElementById('input-render-distance'),
+    renderDistanceVal: document.getElementById('render-distance-val'),
+    toggleCreative: document.getElementById('toggle-creative'),
+    inputNewWorld: document.getElementById('input-new-world'),
+    worldList: document.getElementById('world-list'),
+    worldImportPicker: document.getElementById('world-import-picker'),
+    tabGeneral: document.getElementById('tab-general'),
+    tabWorlds: document.getElementById('tab-worlds'),
+    tabStorage: document.getElementById('tab-storage'),
+    panelGeneral: document.getElementById('panel-general'),
+    panelWorlds: document.getElementById('panel-worlds'),
+    panelStorage: document.getElementById('panel-storage'),
+    storageEngineInfo: document.getElementById('storage-engine-info'),
+    storageUsageInfo: document.getElementById('storage-usage-info'),
+    storageCountsInfo: document.getElementById('storage-counts-info'),
+    btnPurgeAssets: document.getElementById('btn-purge-assets'),
+    btnPurgeStorageAssets: document.getElementById('btn-purge-storage-assets'),
+    btnPurgeStorageAll: document.getElementById('btn-purge-storage-all'),
+    btnFullscreen: document.getElementById('btn-fullscreen'),
+  };
+
+  let engineStarted = false;
+  let audioCtx = null;
+
+  const defaultConfig = {
+    username: 'CloudWalker',
+    renderDistance: 12,
+    worldName: 'New World',
+    creative: false,
+  };
+
+  function loadConfig() {
+    try {
+      const raw = localStorage.getItem(CONFIG_KEY);
+      if (raw) {
+        return { ...defaultConfig, ...JSON.parse(raw) };
+      }
+    } catch (_) {}
+    return { ...defaultConfig };
+  }
+
+  function saveConfig(cfg) {
+    try {
+      localStorage.setItem(CONFIG_KEY, JSON.stringify(cfg));
+    } catch (_) {}
+  }
+
+  const config = loadConfig();
+
+  /* ------------------------------------------------------------------------
+     3. UI Helpers (Toasts, Logs, Status Badges)
+     ------------------------------------------------------------------------ */
+  function showToast(msg) {
+    const node = document.createElement('div');
+    node.className = 'toast';
+    node.textContent = msg;
+    els.toastContainer.appendChild(node);
+    setTimeout(() => node.remove(), 2600);
+  }
+
+  function appendLog(level, message) {
+    const line = document.createElement('div');
+    const lvl = String(level || 'info').toLowerCase();
+    line.className = `log-line--${lvl === 'error' ? 'error' : lvl === 'warn' ? 'warn' : 'info'}`;
+    const ts = new Date().toLocaleTimeString([], { hour12: false });
+    line.textContent = `[${ts}] [${lvl.toUpperCase()}] ${message}`;
+    els.logBody.appendChild(line);
+    if (els.logBody.childElementCount > 200) {
+      els.logBody.removeChild(els.logBody.firstChild);
+    }
+    els.logBody.scrollTop = els.logBody.scrollHeight;
+  }
+
+  function updateCOIBadge() {
+    const coi = window.coiServiceWorker;
+    if (window.crossOriginIsolated) {
+      els.statusCoi.className = 'status-chip status-chip--success status-chip--hide-sm';
+      els.statusCoi.textContent = 'COI Active';
+    } else if (coi && coi.state === 'reloading') {
+      els.statusCoi.className = 'status-chip status-chip--warning status-chip--hide-sm';
+      els.statusCoi.textContent = 'Isolating…';
+    } else {
+      els.statusCoi.className = 'status-chip status-chip--warning status-chip--hide-sm';
+      els.statusCoi.textContent = 'Single-Thread';
+      els.statusCoi.title = (coi && coi.reason) || 'SharedArrayBuffer unavailable without COOP/COEP';
+    }
+  }
+
+  async function checkWebGPU() {
+    if (!('gpu' in navigator)) {
+      els.statusWebGPU.className = 'status-chip status-chip--error status-chip--hide-sm';
+      els.statusWebGPU.textContent = 'No WebGPU';
+      return;
+    }
+    try {
+      const adapter = await navigator.gpu.requestAdapter();
+      if (adapter) {
+        els.statusWebGPU.className = 'status-chip status-chip--success status-chip--hide-sm';
+        els.statusWebGPU.textContent = 'WebGPU Ready';
+      } else {
+        els.statusWebGPU.className = 'status-chip status-chip--warning status-chip--hide-sm';
+        els.statusWebGPU.textContent = 'No GPU Adapter';
+      }
+    } catch (_) {
+      els.statusWebGPU.className = 'status-chip status-chip--warning status-chip--hide-sm';
+      els.statusWebGPU.textContent = 'WebGPU Blocked';
+    }
+  }
+
+  /* ------------------------------------------------------------------------
+     4. Canvas High-DPI, Pointer Lock, Fullscreen & Web Audio Unlock
+     ------------------------------------------------------------------------ */
+  function resizeCanvas() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const width = Math.max(1, Math.floor(window.innerWidth * dpr));
+    const height = Math.max(1, Math.floor(window.innerHeight * dpr));
+    if (canvas.width !== width || canvas.height !== height) {
+      canvas.width = width;
+      canvas.height = height;
+      window.dispatchEvent(new CustomEvent('clouds:resize', { detail: { width, height, dpr } }));
+    }
+  }
+
+  function unlockAudio() {
+    if (!audioCtx) {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (Ctx) {
+        audioCtx = new Ctx();
+      }
+    }
+    if (audioCtx && audioCtx.state === 'suspended') {
+      audioCtx.resume().catch(() => {});
+    }
+  }
+
+  function requestLock() {
+    unlockAudio();
+    if (document.pointerLockElement !== canvas && canvas.requestPointerLock) {
+      try {
+        const res = canvas.requestPointerLock();
+        if (res && typeof res.catch === 'function') {
+          res.catch(() => {});
+        }
+      } catch (_) {}
+    }
+  }
+
+  document.addEventListener('pointerlockchange', () => {
+    const locked = document.pointerLockElement === canvas;
+    if (els.pointerStatusPill) {
+      els.pointerStatusPill.hidden = locked || !engineStarted;
+    }
+    if (!locked) {
+      // Ensure cursor is explicitly visible when unlocked so player can click UI buttons
+      canvas.style.cursor = 'default';
+    }
+  });
+
+  // Never auto-capture: ONLY capture pointer on explicit left-click on the canvas
+  canvas.addEventListener('mousedown', (e) => {
+    if (e.button === 0 && engineStarted && els.optionsModal.hidden && els.onboardingModal.hidden && els.errorModal.hidden) {
+      if (document.pointerLockElement !== canvas) {
+        requestLock();
+      }
+    }
+  });
+
+  window.addEventListener('pointerdown', unlockAudio, { once: true });
+  window.addEventListener('keydown', unlockAudio, { once: true });
+  window.addEventListener('resize', resizeCanvas);
+
+  /* ------------------------------------------------------------------------
+     5. Asset Onboarding & Zip Decompression (resources.zip)
+     ------------------------------------------------------------------------ */
+  function setProgress(pct, label) {
+    const clamped = Math.max(0, Math.min(100, Math.round(pct)));
+    els.progressFill.style.width = `${clamped}%`;
+    els.progressPct.textContent = `${clamped}%`;
+    els.progressLabel.textContent = label;
+  }
+
+  async function detectCachedAssets() {
+    const hasHorizon = await vfs.fileExists('horizon-data.bin');
+    const assetFiles = await vfs.listFiles('assets');
+    const dataFiles = await vfs.listFiles('data');
+    const total = assetFiles.length + dataFiles.length + (hasHorizon ? 1 : 0);
+
+    if (hasHorizon || (assetFiles.length > 0 && dataFiles.length > 0)) {
+      els.cachedSummary.textContent = `${total.toLocaleString()} files stored in ${vfs.mode.toUpperCase()}`;
+      els.viewCachedReady.hidden = false;
+      els.viewDropAssets.hidden = true;
+      els.dropBackRow.hidden = false;
+      return true;
+    }
+
+    els.viewCachedReady.hidden = true;
+    els.viewDropAssets.hidden = false;
+    els.dropBackRow.hidden = true;
+    return false;
+  }
+
+  async function ingestResourcesZip(file) {
+    if (!file) return;
+    if (typeof window.fflate === 'undefined') {
+      window.CloudsWeb.onError('Zip library (fflate) failed to load. Check network connection.');
+      return;
+    }
+
+    els.ingestProgress.hidden = false;
+    setProgress(2, `Reading ${file.name}…`);
+
+    try {
+      const buffer = new Uint8Array(await file.arrayBuffer());
+      setProgress(10, 'Decompressing archive…');
+
+      const entries = await new Promise((resolve, reject) => {
+        window.fflate.unzip(buffer, (err, res) => {
+          if (err) reject(err);
+          else resolve(res);
+        });
+      });
+
+      const filePaths = Object.keys(entries).filter((p) => !p.endsWith('/') && entries[p].length >= 0);
+      if (filePaths.length === 0) {
+        throw new Error('Archive appears to be empty.');
+      }
+
+      // Strip common top-level wrapper folder if user zipped a parent directory
+      const hasDirectStructure = filePaths.some(
+        (p) => p.startsWith('assets/') || p.startsWith('data/') || p === 'horizon-data.bin'
+      );
+      let commonPrefix = '';
+      if (!hasDirectStructure) {
+        const firstSeg = filePaths[0].split('/')[0];
+        if (firstSeg && filePaths.every((p) => p.startsWith(`${firstSeg}/`))) {
+          commonPrefix = `${firstSeg}/`;
+        }
+      }
+
+      const total = filePaths.length;
+      for (let i = 0; i < total; i++) {
+        const rawKey = filePaths[i];
+        const targetPath = commonPrefix ? rawKey.slice(commonPrefix.length) : rawKey;
+        if (!targetPath) continue;
+
+        await vfs.writeFile(targetPath, entries[rawKey]);
+
+        if (i % 20 === 0 || i === total - 1) {
+          const pct = 15 + ((i + 1) / total) * 85;
+          setProgress(pct, `Storing (${i + 1}/${total}): ${targetPath}`);
+        }
+      }
+
+      appendLog('info', `Ingested ${total} resource files into ${vfs.mode.toUpperCase()}.`);
+      showToast(`Imported ${total} asset files`);
+      els.ingestProgress.hidden = true;
+      await detectCachedAssets();
+    } catch (err) {
+      els.ingestProgress.hidden = true;
+      window.CloudsWeb.onError(`Failed to ingest resources.zip: ${err.message || err}`);
+    }
+  }
+
+  /* ------------------------------------------------------------------------
+     6. World Management (saves/ in OPFS / IndexedDB)
+     ------------------------------------------------------------------------ */
+  async function refreshWorldList() {
+    const allSaveFiles = await vfs.listFiles('saves');
+    const worldMap = new Map();
+
+    for (const filePath of allSaveFiles) {
+      const rest = filePath.slice('saves/'.length);
+      const slashIdx = rest.indexOf('/');
+      if (slashIdx === -1) continue;
+      const worldName = rest.slice(0, slashIdx);
+      worldMap.set(worldName, (worldMap.get(worldName) || 0) + 1);
+    }
+
+    // Ensure configured world appears if newly created
+    if (config.worldName && !worldMap.has(config.worldName)) {
+      worldMap.set(config.worldName, 0);
+    }
+
+    els.worldList.innerHTML = '';
+    if (worldMap.size === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'surface-panel modal-subtitle';
+      empty.textContent = 'No worlds in saves/ yet. Create one above or import a .zip.';
+      els.worldList.appendChild(empty);
+      return;
+    }
+
+    for (const [name, count] of worldMap.entries()) {
+      const row = document.createElement('div');
+      row.className = `world-row${config.worldName === name ? ' is-active' : ''}`;
+
+      const info = document.createElement('div');
+      info.className = 'world-row__info';
+      const title = document.createElement('span');
+      title.className = 'world-row__name';
+      title.textContent = name;
+      const meta = document.createElement('span');
+      meta.className = 'world-row__meta';
+      meta.textContent = `${count} file${count === 1 ? '' : 's'}${config.worldName === name ? ' · Active' : ''}`;
+      info.append(title, meta);
+
+      const actions = document.createElement('div');
+      actions.className = 'world-row__actions';
+
+      const selectBtn = document.createElement('button');
+      selectBtn.type = 'button';
+      selectBtn.className = config.worldName === name ? 'btn btn--primary btn--sm' : 'btn btn--secondary btn--sm';
+      selectBtn.textContent = config.worldName === name ? 'Selected' : 'Select';
+      selectBtn.addEventListener('click', () => {
+        config.worldName = name;
+        saveConfig(config);
+        refreshWorldList();
+        showToast(`Active world: ${name}`);
+      });
+
+      const exportBtn = document.createElement('button');
+      exportBtn.type = 'button';
+      exportBtn.className = 'btn btn--ghost btn--sm';
+      exportBtn.textContent = 'Export';
+      exportBtn.addEventListener('click', () => exportWorldZip(name));
+
+      const delBtn = document.createElement('button');
+      delBtn.type = 'button';
+      delBtn.className = 'btn btn--danger btn--sm';
+      delBtn.textContent = 'Delete';
+      delBtn.addEventListener('click', async () => {
+        await vfs.deletePath(`saves/${name}`);
+        if (config.worldName === name) {
+          config.worldName = 'New World';
+          saveConfig(config);
+        }
+        await refreshWorldList();
+        showToast(`Deleted world "${name}"`);
+      });
+
+      actions.append(selectBtn, exportBtn, delBtn);
+      row.append(info, actions);
+      els.worldList.appendChild(row);
+    }
+  }
+
+  async function exportWorldZip(worldName) {
+    if (typeof window.fflate === 'undefined') {
+      window.CloudsWeb.onError('Zip library (fflate) unavailable for export.');
+      return;
+    }
+    const prefix = `saves/${worldName}/`;
+    const files = await vfs.listFiles(`saves/${worldName}`);
+    if (files.length === 0) {
+      showToast('World has no saved files yet.');
+      return;
+    }
+    const zipObj = {};
+    for (const path of files) {
+      const rel = path.startsWith(prefix) ? path.slice(prefix.length) : path;
+      zipObj[rel] = await vfs.readFile(path);
+    }
+    const zipped = window.fflate.zipSync(zipObj, { level: 6 });
+    const blob = new Blob([zipped], { type: 'application/zip' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${worldName.replace(/[^\w.-]+/g, '_')}.zip`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    showToast(`Exported ${worldName}.zip`);
+  }
+
+  async function importWorldZip(file) {
+    if (!file || typeof window.fflate === 'undefined') return;
+    try {
+      const buf = new Uint8Array(await file.arrayBuffer());
+      const entries = await new Promise((resolve, reject) => {
+        window.fflate.unzip(buf, (err, res) => (err ? reject(err) : resolve(res)));
+      });
+      const paths = Object.keys(entries).filter((p) => !p.endsWith('/'));
+      if (paths.length === 0) throw new Error('Empty world zip');
+
+      const baseName = file.name.replace(/\.zip$/i, '') || 'Imported World';
+      const firstSeg = paths[0].split('/')[0];
+      const hasSingleRoot = firstSeg && paths.every((p) => p.startsWith(`${firstSeg}/`));
+
+      for (const p of paths) {
+        const rel = hasSingleRoot ? p.slice(firstSeg.length + 1) : p;
+        if (!rel) continue;
+        await vfs.writeFile(`saves/${baseName}/${rel}`, entries[p]);
+      }
+
+      config.worldName = baseName;
+      saveConfig(config);
+      await refreshWorldList();
+      showToast(`Imported world "${baseName}"`);
+    } catch (err) {
+      window.CloudsWeb.onError(`World import failed: ${err.message || err}`);
+    }
+  }
+
+  /* ------------------------------------------------------------------------
+     7. Options Modal, Tabs & Launch Flow
+     ------------------------------------------------------------------------ */
+  async function refreshStorageInfo() {
+    if (els.storageEngineInfo) {
+      els.storageEngineInfo.textContent = `Mode: ${vfs.mode.toUpperCase()}`;
+    }
+    const hasHorizon = await vfs.fileExists('horizon-data.bin');
+    const assetFiles = await vfs.listFiles('assets');
+    const dataFiles = await vfs.listFiles('data');
+    const worldFiles = await vfs.listFiles('saves');
+    const totalAssets = assetFiles.length + dataFiles.length + (hasHorizon ? 1 : 0);
+
+    if (els.storageCountsInfo) {
+      els.storageCountsInfo.textContent = `Assets: ${totalAssets.toLocaleString()} files | Saves: ${worldFiles.length} files`;
+    }
+
+    if (navigator.storage && navigator.storage.estimate) {
+      try {
+        const est = await navigator.storage.estimate();
+        const usedMB = ((est.usage || 0) / (1024 * 1024)).toFixed(1);
+        const quotaGB = ((est.quota || 0) / (1024 * 1024 * 1024)).toFixed(1);
+        if (els.storageUsageInfo) {
+          els.storageUsageInfo.textContent = `Usage: ~${usedMB} MB used (of ~${quotaGB} GB quota)`;
+        }
+      } catch (_) {
+        if (els.storageUsageInfo) els.storageUsageInfo.textContent = 'Usage: Managed by browser';
+      }
+    }
+  }
+
+  function openOptions(tab = 'general') {
+    if (document.pointerLockElement) {
+      try { document.exitPointerLock(); } catch (_) {}
+    }
+    if (els.pointerStatusPill) {
+      els.pointerStatusPill.hidden = true;
+    }
+    els.optionsModal.hidden = false;
+    els.tabGeneral.setAttribute('aria-selected', String(tab === 'general'));
+    els.tabWorlds.setAttribute('aria-selected', String(tab === 'worlds'));
+    els.tabStorage.setAttribute('aria-selected', String(tab === 'storage'));
+    els.panelGeneral.hidden = tab !== 'general';
+    els.panelWorlds.hidden = tab !== 'worlds';
+    els.panelStorage.hidden = tab !== 'storage';
+    if (tab === 'worlds') refreshWorldList();
+    if (tab === 'storage') refreshStorageInfo();
+  }
+
+  function syncSettingsUI() {
+    els.inputUsername.value = config.username;
+    els.inputRenderDistance.value = String(config.renderDistance);
+    els.renderDistanceVal.textContent = `${config.renderDistance} chunks`;
+    els.toggleCreative.setAttribute('aria-checked', String(Boolean(config.creative)));
+  }
+
+  function launchEngine() {
+    unlockAudio();
+    resizeCanvas();
+    els.onboardingModal.hidden = true;
+    skyBackdrop.hidden = true;
+    engineStarted = true;
+    appendLog('info', `Launching Clouds as "${config.username}" (RD ${config.renderDistance}, world "${config.worldName}").`);
+    window.dispatchEvent(new CustomEvent('clouds:launch', { detail: { config, vfs } }));
+    // Do NOT auto-capture cursor on start; keep cursor visible and free until left click
+    if (els.pointerStatusPill) {
+      els.pointerStatusPill.hidden = false;
+    }
+  }
+
+  /* ------------------------------------------------------------------------
+     8. Global WASM Interop Bridge: window.CloudsWeb
+     ------------------------------------------------------------------------ */
+  window.CloudsWeb = {
+    canvas,
+    readFile: (path) => vfs.readFile(path),
+    fileExists: (path) => vfs.fileExists(path),
+    writeFile: (path, data) => vfs.writeFile(path, data),
+    listFiles: (dir) => vfs.listFiles(dir),
+    config,
+    onEngineReady: () => {
+      engineStarted = true;
+      els.onboardingModal.hidden = true;
+      skyBackdrop.hidden = true;
+      if (els.pointerStatusPill && document.pointerLockElement !== canvas) {
+        els.pointerStatusPill.hidden = false;
+      }
+      canvas.focus();
+      appendLog('info', 'Rust/Wasm engine signaled ready.');
+    },
+    onLog: (level, message) => {
+      const fn = level === 'error' ? console.error : level === 'warn' ? console.warn : console.log;
+      fn(`[CloudsEngine] ${message}`);
+      appendLog(level, message);
+    },
+    onError: (err) => {
+      const msg = err instanceof Error ? err.message : String(err || 'Unknown engine error');
+      appendLog('error', msg);
+      els.errorMessage.textContent = msg;
+      els.errorModal.hidden = false;
+    },
+  };
+
+  /* ------------------------------------------------------------------------
+     9. Event Wiring & Bootstrap
+     ------------------------------------------------------------------------ */
+  function bindEvents() {
+    window.addEventListener('coi-serviceworker', updateCOIBadge);
+
+    // Drop zone & file picker
+    els.dropZone.addEventListener('click', () => els.filePicker.click());
+    els.dropZone.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        els.filePicker.click();
+      }
+    });
+    els.filePicker.addEventListener('change', (e) => {
+      if (e.target.files && e.target.files[0]) {
+        ingestResourcesZip(e.target.files[0]);
+      }
+    });
+    els.dropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      els.dropZone.classList.add('is-dragover');
+    });
+    els.dropZone.addEventListener('dragleave', () => els.dropZone.classList.remove('is-dragover'));
+    els.dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      els.dropZone.classList.remove('is-dragover');
+      if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+        ingestResourcesZip(e.dataTransfer.files[0]);
+      }
+    });
+
+    // Onboarding actions
+    document.getElementById('btn-play-clouds').addEventListener('click', launchEngine);
+    document.getElementById('btn-change-assets').addEventListener('click', () => {
+      els.viewCachedReady.hidden = true;
+      els.viewDropAssets.hidden = false;
+    });
+    document.getElementById('btn-cancel-change-assets').addEventListener('click', () => {
+      els.viewCachedReady.hidden = false;
+      els.viewDropAssets.hidden = true;
+    });
+    document.getElementById('btn-manage-worlds-splash').addEventListener('click', () => openOptions('worlds'));
+
+    const handlePurgeAssets = async () => {
+      if (confirm('Delete all cached Minecraft game resources from browser storage? World saves will be preserved.')) {
+        await vfs.clearAssets();
+        showToast('Resource cache deleted');
+        appendLog('info', 'Cached game resources purged from storage.');
+        await detectCachedAssets();
+        if (!els.optionsModal.hidden) await refreshStorageInfo();
+      }
+    };
+
+    if (els.btnPurgeAssets) {
+      els.btnPurgeAssets.addEventListener('click', handlePurgeAssets);
+    }
+    if (els.btnPurgeStorageAssets) {
+      els.btnPurgeStorageAssets.addEventListener('click', handlePurgeAssets);
+    }
+    if (els.btnPurgeStorageAll) {
+      els.btnPurgeStorageAll.addEventListener('click', async () => {
+        if (confirm('FACTORY RESET: Delete ALL browser data, including cached game resources and all world saves? This cannot be undone.')) {
+          await vfs.clearAll();
+          showToast('All browser storage wiped');
+          appendLog('warn', 'All storage (resources + saves) factory reset.');
+          await detectCachedAssets();
+          await refreshWorldList();
+          if (!els.optionsModal.hidden) await refreshStorageInfo();
+        }
+      });
+    }
+
+    // Legacy pause overlay actions (guarded if elements exist)
+    const btnResumeLock = document.getElementById('btn-resume-lock');
+    if (btnResumeLock) {
+      btnResumeLock.addEventListener('click', () => requestLock());
+    }
+    const btnPauseOptions = document.getElementById('btn-pause-options');
+    if (btnPauseOptions) {
+      btnPauseOptions.addEventListener('click', () => openOptions('general'));
+    }
+    const btnPauseWorlds = document.getElementById('btn-pause-worlds');
+    if (btnPauseWorlds) {
+      btnPauseWorlds.addEventListener('click', () => openOptions('worlds'));
+    }
+
+    // HUD & Options
+    document.getElementById('btn-open-options').addEventListener('click', () => openOptions('general'));
+    document.getElementById('btn-close-options').addEventListener('click', () => {
+      els.optionsModal.hidden = true;
+      if (engineStarted && els.pointerStatusPill && document.pointerLockElement !== canvas) {
+        els.pointerStatusPill.hidden = false;
+      }
+    });
+    els.tabGeneral.addEventListener('click', () => openOptions('general'));
+    els.tabWorlds.addEventListener('click', () => openOptions('worlds'));
+    els.tabStorage.addEventListener('click', () => openOptions('storage'));
+
+    els.inputUsername.addEventListener('input', (e) => {
+      config.username = e.target.value.trim() || 'CloudWalker';
+      saveConfig(config);
+    });
+    els.inputRenderDistance.addEventListener('input', (e) => {
+      config.renderDistance = Number(e.target.value);
+      els.renderDistanceVal.textContent = `${config.renderDistance} chunks`;
+      saveConfig(config);
+    });
+    els.toggleCreative.addEventListener('click', () => {
+      config.creative = !config.creative;
+      els.toggleCreative.setAttribute('aria-checked', String(config.creative));
+      saveConfig(config);
+    });
+
+    // World creation & import
+    document.getElementById('btn-create-world').addEventListener('click', async () => {
+      const name = els.inputNewWorld.value.trim();
+      if (!name) return;
+      await vfs.writeFile(`saves/${name}/.clouds_world`, new Uint8Array([1]));
+      config.worldName = name;
+      saveConfig(config);
+      els.inputNewWorld.value = '';
+      await refreshWorldList();
+      showToast(`Created world "${name}"`);
+    });
+    document.getElementById('btn-import-world').addEventListener('click', () => els.worldImportPicker.click());
+    els.worldImportPicker.addEventListener('change', (e) => {
+      if (e.target.files && e.target.files[0]) {
+        importWorldZip(e.target.files[0]);
+      }
+    });
+
+    // Logs, Fullscreen & Error dismiss
+    document.getElementById('btn-toggle-logs').addEventListener('click', () => {
+      els.logDrawer.hidden = !els.logDrawer.hidden;
+    });
+    document.getElementById('btn-clear-logs').addEventListener('click', () => {
+      els.logBody.innerHTML = '';
+    });
+    document.getElementById('btn-dismiss-error').addEventListener('click', () => {
+      els.errorModal.hidden = true;
+    });
+    els.btnFullscreen.addEventListener('click', () => {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      } else {
+        document.exitFullscreen().catch(() => {});
+      }
+    });
+    document.addEventListener('fullscreenchange', () => {
+      els.btnFullscreen.textContent = document.fullscreenElement ? 'Exit Fullscreen' : 'Fullscreen';
+    });
+  }
+
+  async function init() {
+    resizeCanvas();
+    syncSettingsUI();
+    bindEvents();
+    updateCOIBadge();
+    checkWebGPU();
+
+    const mode = await vfs.init();
+    els.statusStorage.className = 'status-chip status-chip--success';
+    els.statusStorage.textContent = mode === 'opfs' ? 'OPFS Ready' : 'IndexedDB Ready';
+
+    await detectCachedAssets();
+    appendLog('info', `Clouds frontend initialized (${mode.toUpperCase()}).`);
+  }
+
+  init();
+})();
+
+</script>
+<script type="module">
+  import initWasm, { clouds_start, clouds_vfs_write, clouds_vfs_read } from './clouds.js';
+
+  let wasmLoaded = false;
+  let wasmInitPromise = null;
+
+  function ensureWasm() {
+    if (!wasmInitPromise) {
+      wasmInitPromise = initWasm('./clouds_bg.wasm').then(() => {
+        wasmLoaded = true;
+        window.CloudsWeb.onLog('info', 'Clouds WebGPU WebAssembly runtime initialized.');
+      }).catch(err => {
+        window.CloudsWeb.onError(err);
+      });
+    }
+    return wasmInitPromise;
+  }
+
+  // Preload WASM on page load
+  ensureWasm();
+
+  window.addEventListener('clouds:launch', async (event) => {
+    const { config, vfs } = event.detail;
+    try {
+      window.CloudsWeb.onLog('info', 'Preparing virtual filesystem from OPFS...');
+      await ensureWasm();
+
+      // 1. Pass horizon-data.bin into Rust if present
+      if (await vfs.fileExists('horizon-data.bin')) {
+        window.CloudsWeb.onLog('info', 'Loading horizon-data.bin container into WASM memory...');
+        const bin = await vfs.readFile('horizon-data.bin');
+        clouds_vfs_write('horizon-data.bin', bin);
+      }
+
+      // 2. Pass root JSON/NBT files
+      const rootFiles = [
+        'horizon-resources.json', 'registries.json', 'items.json',
+        'block-behaviours.json', 'commands.json', 'command-registries.json',
+        'entity-models.json', 'entity-types.json', 'facts.json',
+        'gameplay-facts.json', 'model-states.json', 'movement-properties.nbt',
+        'occlusion.nbt', 'damage-catalog.json', 'damage-tags.json', 'damage-types.json',
+        'creative-inventory.json', 'landing-definitions.json', 'mob-data.json',
+        'render-definitions.json'
+      ];
+
+      for (const rf of rootFiles) {
+        if (await vfs.fileExists(rf)) {
+          const bytes = await vfs.readFile(rf);
+          clouds_vfs_write(rf, bytes);
+        }
+      }
+
+      // 3. Load active world saves if present
+      const worldFiles = await vfs.listFiles(`saves/${config.worldName}`);
+      for (const wf of worldFiles) {
+        const bytes = await vfs.readFile(wf);
+        clouds_vfs_write(wf, bytes);
+      }
+
+      window.CloudsWeb.onEngineReady();
+      window.CloudsWeb.onLog('info', `Starting simulation for world "${config.worldName}"...`);
+      clouds_start(config.username, config.worldName, config.renderDistance, config.creative);
+    } catch (err) {
+      window.CloudsWeb.onError(err);
+    }
+  });
+</script>
+</body>
+</html>
