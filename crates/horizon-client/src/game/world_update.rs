@@ -330,6 +330,9 @@ impl Game<'_> {
             // The meshes, once copied, are freed by a worker (`Streaming::free`).
             if !budgeted && self.pending_uploads.is_empty() && uploads.len() <= AUTO_UPLOADS_AT_ONCE
             {
+                if !uploads.is_empty() {
+                    log::info!("Horizon: uploading {} meshed sections to GPU", uploads.len());
+                }
                 horizon_client::spans::time("upload", || {
                     for (key, mesh) in &uploads {
                         renderer.upload(*key, mesh);

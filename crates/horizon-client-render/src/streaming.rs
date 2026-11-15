@@ -1655,6 +1655,8 @@ impl Streaming {
         &mut self,
         world: &mut World,
     ) -> (Vec<((i32, i32, i32), SectionMesh)>, Vec<Arc<Chunk>>) {
+        #[cfg(target_arch = "wasm32")]
+        horizon_threads::jobs::pump_jobs();
         let mut hz_laps = crate::spans::laps();
         let mut uploads = Vec::new();
         if self.paused {
@@ -2122,6 +2124,8 @@ impl Streaming {
         self.gone_scratch = gone;
         self.mesh_candidates_scratch = candidates;
         self.mesh_columns_scratch = columns;
+        #[cfg(target_arch = "wasm32")]
+        horizon_threads::jobs::pump_jobs();
         (uploads, removed)
     }
     fn schedule_generation(&mut self, world: &World, workers: usize) {
