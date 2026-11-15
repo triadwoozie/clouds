@@ -405,6 +405,8 @@ impl Game<'_> {
                 return;
             }
             self.update_world();
+            #[cfg(target_arch = "wasm32")]
+            horizon_threads::jobs::pump_jobs();
             self.streaming.wait(Duration::from_millis(5));
         }
     }

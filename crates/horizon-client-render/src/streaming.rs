@@ -2467,6 +2467,8 @@ impl Streaming {
     /// Wait up to `timeout` for a worker to finish a job; the next `update`
     /// takes it. A server pumps generation with this between its ticks.
     pub fn wait(&mut self, timeout: std::time::Duration) {
+        #[cfg(target_arch = "wasm32")]
+        horizon_threads::jobs::pump_jobs();
         if let Some(done) = self.shared.done.recv_timeout(timeout) {
             self.deferred.push(done);
         }

@@ -1631,12 +1631,15 @@ impl Game<'_> {
             if self.level.spawn.is_none() {
                 let [x, y, z] = loop {
                     self.update_world();
+                    #[cfg(target_arch = "wasm32")]
+                    horizon_threads::jobs::pump_jobs();
                     if let Some(pos) = self.find_world_spawn()? {
                         break pos;
                     }
                     if Instant::now() > deadline {
                         return Err("the spawn area did not load".into());
                     }
+                    #[cfg(not(target_arch = "wasm32"))]
                     std::thread::sleep(Duration::from_millis(2));
                 };
                 self.level.spawn = Some([f64::from(x), f64::from(y), f64::from(z)]);
@@ -1651,10 +1654,13 @@ impl Game<'_> {
         }
         while self.player.is_none() {
             self.update_world();
+            #[cfg(target_arch = "wasm32")]
+            horizon_threads::jobs::pump_jobs();
             self.spawn_player()?;
             if Instant::now() > deadline {
                 return Err("the spawn area did not load".into());
             }
+            #[cfg(not(target_arch = "wasm32"))]
             std::thread::sleep(Duration::from_millis(2));
         }
         self.player = None;
