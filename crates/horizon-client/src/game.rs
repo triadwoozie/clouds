@@ -5534,6 +5534,8 @@ impl Game<'_> {
             }
         }
         if self.remote.is_some() {
+            #[cfg(target_arch = "wasm32")]
+            let _ = integrated::tick_wasm_integrated_server();
             return self.tick_remote();
         }
         // Only a server ticks its own world from here: its players are guests, swapped in for

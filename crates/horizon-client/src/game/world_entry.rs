@@ -24,6 +24,8 @@ impl Game<'_> {
     }
 
     pub(super) fn resume_world_entry(&mut self) -> Result<()> {
+        #[cfg(target_arch = "wasm32")]
+        let _ = integrated::tick_wasm_integrated_server();
         self.poll_integrated_start()?;
         self.poll_world_rest()?;
         self.poll_world_creation();

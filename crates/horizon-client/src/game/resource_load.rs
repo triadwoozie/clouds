@@ -47,7 +47,7 @@ impl Progress {
 /// output stays byte-identical; only an ordinary launch shows the window first.
 pub(super) fn synchronous_startup(_options: &Options) -> bool {
     #[cfg(target_arch = "wasm32")]
-    return true;
+    return _options.headless || _options.frames.is_some() || !_options.execution_role.is_client();
     #[cfg(not(target_arch = "wasm32"))]
     {
         _options.headless

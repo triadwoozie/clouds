@@ -698,6 +698,11 @@ fn release() {
 #[cfg(not(any(all(target_os = "linux", target_env = "gnu"), target_vendor = "apple")))]
 fn release() {}
 
+#[cfg(target_arch = "wasm32")]
+pub fn make_static_ref<T>(r: &T) -> &'static T {
+    unsafe { &*(r as *const T) }
+}
+
 /// The REPARSE_DATA_BUFFER of a mount point naming `name` (UTF-16, `\??\` prefixed). The length
 /// fields are 16 bits: a name too long for them is an error, so the caller copies instead.
 #[cfg(windows)]

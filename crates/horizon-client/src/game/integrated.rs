@@ -258,12 +258,19 @@ impl Integrated {
         self.flags.stop.store(true, Ordering::Relaxed);
     }
     pub fn stopped(&self) -> bool {
+        #[cfg(target_arch = "wasm32")]
+        {
+            return self.flags.stop.load(Ordering::Relaxed);
+        }
+        #[cfg(not(target_arch = "wasm32"))]
         self.thread
             .as_ref()
             .is_none_or(|thread| thread.is_finished())
     }
     fn halt(&mut self) -> Result<()> {
         self.request_stop();
+        #[cfg(target_arch = "wasm32")]
+        let _ = stop_wasm_integrated_server();
         if let Some(thread) = self.thread.take() {
             thread
                 .join()
@@ -1343,6 +1350,8 @@ fn serve(
         world,
         sync: preload_sync_data(&options.resources),
     };
+    #[cfg(target_arch = "wasm32")]
+    let res = horizon_threads::make_static_ref(res);
     let mut server = match startup::time("server.game_new", || {
         server_game(res, pack, options, settings)
     }) {
@@ -1355,7 +1364,74 @@ fn serve(
             return Err(e);
         }
     };
+    #[cfg(target_arch = "wasm32")]
+    {
+        if let Err(e) = server.integrated_open(&launch, &flags, tasks, ready, opening) {
+            server.native_lifecycle_world_failed(&e.to_string());
+            return Err(e);
+        }
+        server.native_lifecycle_world_ready();
+        store_wasm_integrated_server(server);
+        Ok(())
+    }
+    #[cfg(not(target_arch = "wasm32"))]
     server.run_integrated(launch, flags, tasks, ready, opening)
+}
+
+#[cfg(target_arch = "wasm32")]
+std::thread_local! {
+    static WASM_INTEGRATED_SERVER: std::cell::RefCell<Option<Box<Game<'static>>>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+#[cfg(target_arch = "wasm32")]
+pub(super) fn store_wasm_integrated_server(server: Game<'static>) {
+    WASM_INTEGRATED_SERVER.with(|s| {
+        *s.borrow_mut() = Some(Box::new(server));
+    });
+}
+
+#[cfg(target_arch = "wasm32")]
+pub(super) fn stop_wasm_integrated_server() -> Result<()> {
+    let server = WASM_INTEGRATED_SERVER.with(|s| s.borrow_mut().take());
+    if let Some(mut server) = server {
+        server.stop_integrated()?;
+    }
+    Ok(())
+}
+
+#[cfg(target_arch = "wasm32")]
+pub(super) fn tick_wasm_integrated_server() -> Result<()> {
+    WASM_INTEGRATED_SERVER.with(|cell| {
+        let mut borrow = match cell.try_borrow_mut() {
+            Ok(b) => b,
+            Err(_) => return Ok(()),
+        };
+        let Some(server) = borrow.as_mut() else {
+            return Ok(());
+        };
+        let flags = match &server.serving {
+            Some(s) => s.flags.clone(),
+            None => return Ok(()),
+        };
+        if flags.stop.load(Ordering::Relaxed) {
+            return Ok(());
+        }
+        server.run_tasks();
+        if server.agent.hold_server {
+            return Ok(());
+        }
+        let paused = flags.paused.load(Ordering::Relaxed);
+        if paused {
+            server.tick_server_measured(true)?;
+        } else {
+            server.follow_distances(&flags);
+            server.tick_server_measured(false)?;
+        }
+        server.apply_publish();
+        server.publish_load_view();
+        Ok(())
+    })
 }
 
 /// What `serve` starts beside the server's own Game.

@@ -218,10 +218,7 @@ pub fn clouds_vfs_write(path: String, data: Vec<u8>) -> Result<(), JsValue> {
         }
     }
     let clean = path.trim_start_matches('.').trim_start_matches('/').to_string();
-    if clean != path {
-        horizon_core::prepared_files::vfs_write(&clean, data.clone());
-    }
-    horizon_core::prepared_files::vfs_write(&path, data);
+    horizon_core::prepared_files::vfs_write(&clean, data);
     Ok(())
 }
 
