@@ -8025,6 +8025,23 @@ impl Renderer {
             }
             self.surface_unconfigured = false;
         }
+        #[cfg(target_arch = "wasm32")]
+        {
+            let current_size = self.window.inner_size();
+            if current_size.width > 1
+                && current_size.height > 1
+                && (current_size.width != self.config.width || current_size.height != self.config.height)
+            {
+                log::info!(
+                    "Horizon: auto-resizing renderer to match window canvas {}x{} (was {}x{})",
+                    current_size.width,
+                    current_size.height,
+                    self.config.width,
+                    self.config.height
+                );
+                self.resize(current_size.width, current_size.height);
+            }
+        }
         laps.lap("r_prepare");
         // Frame generation: its present thread acquires and presents, this frame draws
         // into frames of its own. Not over menus that blur the frame, a shader pack's
@@ -8070,7 +8087,21 @@ impl Renderer {
         self.queue.take_waited();
         let (surface_frame, reconfigure) = match acquired {
             None => (None, false),
-            Some(wgpu::CurrentSurfaceTexture::Success(f)) => (Some(f), false),
+            Some(wgpu::CurrentSurfaceTexture::Success(f)) => {
+                #[cfg(target_arch = "wasm32")]
+                if f.texture.width() != self.config.width || f.texture.height() != self.config.height {
+                    log::info!(
+                        "Horizon: swapchain texture {}x{} != config {}x{}, resizing",
+                        f.texture.width(),
+                        f.texture.height(),
+                        self.config.width,
+                        self.config.height
+                    );
+                    self.resize(f.texture.width(), f.texture.height());
+                    return Ok(false);
+                }
+                (Some(f), false)
+            }
             Some(wgpu::CurrentSurfaceTexture::Suboptimal(f)) => (Some(f), true),
             Some(wgpu::CurrentSurfaceTexture::Timeout | wgpu::CurrentSurfaceTexture::Occluded) => {
                 return Ok(false);

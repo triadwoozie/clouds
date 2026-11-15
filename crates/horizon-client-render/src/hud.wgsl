@@ -39,9 +39,9 @@ struct Out {
     if in.uv.x >= 2.0 {
         let armor = in.uv.x >= 4.0;
         let offset = select(2.0, 4.0, armor);
-        let mask = textureSample(atlas, atlas_sampler, in.uv - vec2(offset, 0.0)).a;
-        let item_sample = textureSample(glint_tex, glint_sampler, in.glint_uv);
-        let armor_sample = textureSample(glint_armor_tex, glint_sampler, in.glint_uv);
+        let mask = textureSampleLevel(atlas, atlas_sampler, in.uv - vec2(offset, 0.0), 0.0).a;
+        let item_sample = textureSampleLevel(glint_tex, glint_sampler, in.glint_uv, 0.0);
+        let armor_sample = textureSampleLevel(glint_armor_tex, glint_sampler, in.glint_uv, 0.0);
         if mask < 0.1 { discard; }
         var glint = hud.size.w * select(item_sample, armor_sample, armor);
         let tint = hud.end_portal[2].yzw;
@@ -50,7 +50,7 @@ struct Out {
         }
         return vec4(glint.rgb * glint.rgb, mask);
     }
-    let c = textureSample(atlas, atlas_sampler, in.uv) * in.color;
+    let c = textureSampleLevel(atlas, atlas_sampler, in.uv, 0.0) * in.color;
     if c.a < 0.004 { discard; }
     return c;
 }

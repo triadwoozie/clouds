@@ -2638,7 +2638,6 @@ Would you like to enable the Narrator or visit the Accessibility Settings?",
         hide_server_address: bool,
     ) {
         let (w, h) = (batch.width.ceil(), batch.height.ceil());
-        log::info!("Horizon: Title::draw_with_items entered, preparing={}, rules={}", self.preparing, self.rules.borrow().is_some());
         if let Some(rules) = self.rules.borrow_mut().as_mut() {
             return rules.draw(batch, atlas, cursor);
         }

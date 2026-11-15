@@ -311,7 +311,7 @@ fn entity_color(in: Out, front: bool) -> vec4<f32> {
         // Each crack's stage sprite origin comes in its light bytes (breaking::stage_light).
         uv = crumbling_uv(in.uv, in.wrap, globals.crumbling_sprite.zw, textureDimensions(atlas));
     }
-    let texel = textureSample(atlas, atlas_sampler, uv);
+    let texel = textureSampleLevel(atlas, atlas_sampler, uv, 0.0);
     var tint = select(in.back_color, in.color, front);
     if in.overlay == 38u {
         // RenderPipelines.ENTITY_CUTOUT_DISSOLVE (entity.fsh's DISSOLVE): gone where the vertex
@@ -382,14 +382,14 @@ fn shadow_color(in: Out) -> vec4<f32> {
     // Beams wrap their v in the sprite as fs_entity does: sample where they draw.
     var uv = in.uv;
     if in.overlay == 6u { uv.y = in.wrap.x + fract(in.uv.y) * in.wrap.y; }
-    let texel = textureSample(atlas, atlas_sampler, uv);
+    let texel = textureSampleLevel(atlas, atlas_sampler, uv, 0.0);
     if texel.a < 0.1 { discard; }
     return vec4(0.0, 0.0, 0.0, hdr_entity_mark(in));
 }
 fn hdr_entity_mark(in: Out) -> f32 {
     var uv = in.uv;
     if in.overlay == 6u { uv.y = in.wrap.x + fract(in.uv.y) * in.wrap.y; }
-    let texel = textureSample(atlas, atlas_sampler, uv);
+    let texel = textureSampleLevel(atlas, atlas_sampler, uv, 0.0);
     // Additive and procedural colour draws can survive where the legacy mark pass skips.
     if texel.a < 0.1 { return 1.0; }
     // Fog hides a light source and the light on a surface as it hides everything else.
@@ -487,7 +487,7 @@ fn celestial_color(in: Out) -> vec4<f32> {
 fn energy_swirl_base(in: Out) -> vec4<f32> {
     let bytes = round(in.color * 255.0);
     let size = vec2(bytes.x + bytes.y * 256.0, bytes.z + bytes.w * 256.0) / 65535.0;
-    let color = textureSample(atlas, atlas_sampler, crumbling_uv(in.uv, in.wrap, size, textureDimensions(atlas)));
+    let color = textureSampleLevel(atlas, atlas_sampler, crumbling_uv(in.uv, in.wrap, size, textureDimensions(atlas)), 0.0);
     if color.a < 0.1 { discard; }
     return vec4(color.rgb * (128.0 / 255.0), color.a);
 }
@@ -547,7 +547,7 @@ fn weather_double_plus_float(base: vec2<u32>, delta: f32) -> f32 {
     }
     let e = max(be, de);
     // Leading significand bit at 61, with room for addition and guard bits.
-    var a = vec2(base.x << 9u, ((base.y & 0xfffffu) | 0x100000u) << 9u | (base.x >> 23u));
+    var a = vec2(base.x << 9u, (((base.y & 0xfffffu) | 0x100000u) << 9u) | (base.x >> 23u));
     var b = vec2(0u, dm << 6u);
     a = weather_shr_jam(a, u32(e - be));
     b = weather_shr_jam(b, u32(e - de));
