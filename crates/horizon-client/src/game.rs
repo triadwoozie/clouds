@@ -11261,7 +11261,9 @@ impl Game<'_> {
                                 self.started.elapsed().as_millis()
                             );
                         }
-                        log::info!("Horizon: frame {} completed draw, perf.title_shown", self.frames);
+                        if self.frames == 0 {
+                            log::debug!("Horizon: frame {} completed draw, perf.title_shown", self.frames);
+                        }
                         if self.title.is_some() {
                             self.perf.title_shown();
                         } else if self.screen == Screen::Playing && self.player.is_some() {

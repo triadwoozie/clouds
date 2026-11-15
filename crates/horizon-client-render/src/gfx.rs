@@ -5497,20 +5497,9 @@ impl Renderer {
     }
     /// Follows the window to `width` x `height`. A size the swapchain can't take
     /// ([`drawable_size`]) keeps the last one and draws nothing until the next.
-    pub fn resize(&mut self, mut width: u32, mut height: u32) {
-        #[cfg(target_arch = "wasm32")]
-        {
-            if width <= 1 || height <= 1 {
-                width = 1280;
-                height = 720;
-            }
-        }
+    pub fn resize(&mut self, width: u32, height: u32) {
         let max = self.device.limits().max_texture_dimension_2d;
         self.suspended = !drawable_size(width, height, max);
-        #[cfg(target_arch = "wasm32")]
-        {
-            self.suspended = false;
-        }
         if self.suspended {
             return;
         }

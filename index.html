@@ -966,6 +966,14 @@ body.pointer-locked .hud-bar {
             </div>
             <button type="button" id="toggle-creative" class="toggle-switch" role="switch" aria-checked="false" aria-label="Toggle Creative Mode"></button>
           </div>
+
+          <div class="toggle-row">
+            <div>
+              <div style="font-weight: 500;">Title Screen First</div>
+              <div class="modal-subtitle" style="font-size: var(--text-xs);">Open authentic Minecraft Java Edition title screen with singleplayer and settings menus</div>
+            </div>
+            <button type="button" id="toggle-boot-title" class="toggle-switch" role="switch" aria-checked="true" aria-label="Toggle Title Screen First"></button>
+          </div>
         </section>
 
         <!-- Worlds Management Panel -->
@@ -1305,6 +1313,7 @@ body.pointer-locked .hud-bar {
     inputRenderDistance: document.getElementById('input-render-distance'),
     renderDistanceVal: document.getElementById('render-distance-val'),
     toggleCreative: document.getElementById('toggle-creative'),
+    toggleBootTitle: document.getElementById('toggle-boot-title'),
     inputNewWorld: document.getElementById('input-new-world'),
     worldList: document.getElementById('world-list'),
     worldImportPicker: document.getElementById('world-import-picker'),
@@ -1333,6 +1342,7 @@ body.pointer-locked .hud-bar {
     renderDistance: isMobile ? 8 : 12,
     worldName: 'New World',
     creative: false,
+    bootToTitle: true,
   };
 
   function loadConfig() {
@@ -1793,6 +1803,9 @@ body.pointer-locked .hud-bar {
     els.inputRenderDistance.value = String(config.renderDistance);
     els.renderDistanceVal.textContent = `${config.renderDistance} chunks`;
     els.toggleCreative.setAttribute('aria-checked', String(Boolean(config.creative)));
+    if (els.toggleBootTitle) {
+      els.toggleBootTitle.setAttribute('aria-checked', String(config.bootToTitle !== false));
+    }
   }
 
   function launchEngine() {
@@ -1958,6 +1971,13 @@ body.pointer-locked .hud-bar {
       els.toggleCreative.setAttribute('aria-checked', String(config.creative));
       saveConfig(config);
     });
+    if (els.toggleBootTitle) {
+      els.toggleBootTitle.addEventListener('click', () => {
+        config.bootToTitle = config.bootToTitle === false;
+        els.toggleBootTitle.setAttribute('aria-checked', String(config.bootToTitle !== false));
+        saveConfig(config);
+      });
+    }
 
     // World creation & import
     document.getElementById('btn-create-world').addEventListener('click', async () => {
@@ -2062,15 +2082,18 @@ body.pointer-locked .hud-bar {
       }
 
       // 3. Load active world saves if present
-      const worldFiles = await vfs.listFiles(`saves/${config.worldName}`);
-      for (const wf of worldFiles) {
-        const bytes = await vfs.readFile(wf);
-        clouds_vfs_write(wf, bytes);
+      const targetWorld = config.bootToTitle !== false ? null : (config.worldName || null);
+      if (targetWorld) {
+        const worldFiles = await vfs.listFiles(`saves/${targetWorld}`);
+        for (const wf of worldFiles) {
+          const bytes = await vfs.readFile(wf);
+          clouds_vfs_write(wf, bytes);
+        }
       }
 
       window.CloudsWeb.onEngineReady();
-      window.CloudsWeb.onLog('info', `Starting Minecraft title screen as "${config.username}"...`);
-      await clouds_start(config.username, null, config.renderDistance, config.creative);
+      window.CloudsWeb.onLog('info', `Starting Minecraft as "${config.username}" (${targetWorld ? `world "${targetWorld}"` : 'Title Screen'})...`);
+      await clouds_start(config.username, targetWorld, config.renderDistance, config.creative);
     } catch (err) {
       window.CloudsWeb.onError(err);
     }

@@ -422,7 +422,7 @@ pub(super) fn start_game<'a>(
             title.last_server = game.settings.file.string("lastServer");
             title.skip_multiplayer_warning = game.settings.file.bool("skipMultiplayerWarning");
             // Gui.addInitialScreens: the accessibility onboarding comes first.
-            if false && game.settings.file.bool("onboardAccessibility") {
+            if !cfg!(target_arch = "wasm32") && game.settings.file.bool("onboardAccessibility") {
                 title.start_onboarding();
             }
             game.title = Some(title);

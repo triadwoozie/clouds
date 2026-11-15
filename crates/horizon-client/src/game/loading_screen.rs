@@ -276,7 +276,10 @@ impl Loading {
         self.poll_menu_realms(event_loop);
         if let Some(w) = &self.window {
             #[cfg(target_arch = "wasm32")]
-            self.draw();
+            {
+                self.draw();
+                w.request_redraw();
+            }
             #[cfg(not(target_arch = "wasm32"))]
             if self.options.as_ref().is_some_and(|o| o.offscreen) {
                 self.draw();
@@ -284,6 +287,9 @@ impl Loading {
                 w.request_redraw();
             }
         }
+        #[cfg(target_arch = "wasm32")]
+        event_loop.set_control_flow(ControlFlow::Wait);
+        #[cfg(not(target_arch = "wasm32"))]
         event_loop.set_control_flow(ControlFlow::Poll);
     }
     pub(super) fn draw(&mut self) {

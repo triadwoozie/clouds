@@ -291,7 +291,7 @@ pub async fn clouds_start(
     let name = username.unwrap_or_else(|| "Clouds".to_string());
     horizon_client::web_options::set_options(
         Some(name),
-        None,
+        world_name,
         render_distance,
         creative.unwrap_or(false),
     );

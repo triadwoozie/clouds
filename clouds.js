@@ -1,4 +1,4 @@
-/* @ts-self-types="./clouds_wasm.d.ts" */
+/* @ts-self-types="./clouds.d.ts" */
 
 /**
  * Start the Clouds game engine inside the browser.
