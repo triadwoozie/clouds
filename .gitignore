@@ -35,6 +35,7 @@
 
 # Release-only compiled original exporter bundle.
 /exporters/
+/pkg/
 
 # Game assets & user containers (kept local on device for anti-piracy)
 *.bin

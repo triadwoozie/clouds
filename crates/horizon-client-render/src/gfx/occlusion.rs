@@ -553,6 +553,8 @@ struct Worker {
 
 impl Worker {
     fn spawn(min_y: i32, sections: i32) -> Option<Self> {
+        #[cfg(target_arch = "wasm32")]
+        return None;
         let (jobs, job_rx) = mpsc::channel::<Job>();
         let (done_tx, done) = mpsc::channel();
         std::thread::Builder::new()

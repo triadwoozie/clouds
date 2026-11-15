@@ -1003,8 +1003,8 @@ fn checked<T>(device: &wgpu::Device, create: impl FnOnce() -> T) -> Result<T, St
     let validation = device.push_error_scope(wgpu::ErrorFilter::Validation);
     let internal = device.push_error_scope(wgpu::ErrorFilter::Internal);
     let value = crate::crash::contain(create);
-    let internal = pollster::block_on(internal.pop());
-    match pollster::block_on(validation.pop()).or(internal) {
+    let internal = crate::gfx::pop_scope(internal);
+    match crate::gfx::pop_scope(validation).or(internal) {
         Some(e) => {
             // The details are in the error's description or its sources.
             let mut message = match &e {
@@ -1441,6 +1441,16 @@ fn compile(
     cancel: &std::sync::atomic::AtomicBool,
 ) -> Option<(String, String)> {
     use std::sync::atomic::{AtomicUsize, Ordering};
+    #[cfg(target_arch = "wasm32")]
+    {
+        for job in jobs {
+            if cancel.load(Ordering::Relaxed) { break; }
+            if let Err(e) = checked(device, || job.create(device)) {
+                return Some((job.label().to_owned(), e));
+            }
+        }
+        return None;
+    }
     let threads = std::thread::available_parallelism()
         .map_or(1, |n| n.get())
         .clamp(1, 8)

@@ -729,6 +729,11 @@ pub fn free_later<T: Send + 'static>(items: Vec<T>) {
     if items.is_empty() {
         return;
     }
+    #[cfg(target_arch = "wasm32")]
+    {
+        drop(items);
+        return;
+    }
     let _ = std::thread::Builder::new()
         .name("Buffer freeing".into())
         .spawn(move || drop(items));
@@ -742,6 +747,7 @@ pub(super) fn try_create(
     size: u64,
     usage: wgpu::BufferUsages,
 ) -> Option<wgpu::Buffer> {
+    #[cfg(not(target_arch = "wasm32"))]
     let scope = device.push_error_scope(wgpu::ErrorFilter::OutOfMemory);
     let buffer = device.create_buffer(&wgpu::BufferDescriptor {
         label: Some(label),
@@ -749,7 +755,10 @@ pub(super) fn try_create(
         usage,
         mapped_at_creation: false,
     });
-    // Native error scopes resolve at once.
+    // Native error scopes resolve at once on desktop. On web, popErrorScope is async.
+    #[cfg(target_arch = "wasm32")]
+    return Some(buffer);
+    #[cfg(not(target_arch = "wasm32"))]
     pollster::block_on(scope.pop()).is_none().then_some(buffer)
 }
 

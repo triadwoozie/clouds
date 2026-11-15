@@ -190,6 +190,8 @@ pub(super) struct SyncPreload(std::thread::JoinHandle<std::result::Result<SyncDa
 /// Start reading the server's data beside the world's preparation; `None`
 /// when it is read already, or being read (`preload_world_data`).
 pub(super) fn preload_sync_data(root: &std::path::Path) -> Option<SyncPreload> {
+    #[cfg(target_arch = "wasm32")]
+    return None;
     if !SYNC
         .try_lock()
         .is_ok_and(|sync| sync.data.is_none() && sync.damage.is_none())

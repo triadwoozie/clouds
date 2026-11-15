@@ -143,7 +143,7 @@ impl NativeSky {
             &present,
             format,
         );
-        if let Some(e) = pollster::block_on(scope.pop()) {
+        if let Some(e) = crate::gfx::pop_scope(scope) {
             return Err(format!("{}: {e}", stage.file));
         }
         Ok(Self {

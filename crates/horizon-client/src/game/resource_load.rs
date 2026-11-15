@@ -501,7 +501,7 @@ pub(super) fn load_resources(
     // The block entity renderer's face visibility: the meshes' own, whose
     // shapes already hold their faces, not a second load of the same tables.
     let visibility = pack.context.tables.visibility.clone();
-    let rest_loader = if menu {
+    let rest_loader = if menu && !cfg!(target_arch = "wasm32") {
         let resources = resources.clone();
         let root = root.clone();
         let vanilla_root = vanilla_root.to_owned();
@@ -614,6 +614,8 @@ pub(super) fn load_resources(
 /// This start has just read the folder's files (they are in the disk cache);
 /// the next starts read them from one file (#1961).
 pub(super) fn write_prepared_files(root: PathBuf) {
+    #[cfg(target_arch = "wasm32")]
+    return;
     use horizon_core::prepared_files;
     if prepared_files::open(&root).is_some() || !root.join("horizon-resources.json").is_file() {
         return;

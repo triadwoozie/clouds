@@ -526,8 +526,8 @@ fn pipeline(device: &wgpu::Device) -> Option<(wgpu::ComputePipeline, wgpu::BindG
         cache: None,
     });
     let layout = pipeline.get_bind_group_layout(0);
-    let internal = pollster::block_on(internal.pop());
-    match internal.or(pollster::block_on(validation.pop())) {
+    let internal = crate::gfx::pop_scope(internal);
+    match internal.or(crate::gfx::pop_scope(validation)) {
         None => Some((pipeline, layout)),
         Some(e) => {
             log::warn!("Horizon renderer: animated sprites drawn on the CPU ({e})");

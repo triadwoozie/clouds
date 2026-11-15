@@ -327,8 +327,11 @@ pub fn main_with(mods: crate::mod_api::Mods) {
         #[cfg(target_arch = "wasm32")]
         panic!("Horizon runtime error: {error}");
     }
-    horizon_hooks::engine::shutdown();
-    logging::flush();
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        horizon_hooks::engine::shutdown();
+        logging::flush();
+    }
 }
 
 /// The JVM raises its open-file limit to the hard limit as it starts

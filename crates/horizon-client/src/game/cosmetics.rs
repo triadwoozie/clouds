@@ -181,6 +181,8 @@ impl AccountSync {
 
     /// Sends `wish` on a thread.
     fn start(&mut self, wish: bool, send: fn(bool) -> Result<(), String>) {
+        #[cfg(target_arch = "wasm32")]
+        return;
         self.wish = Some(wish);
         self.again = None;
         let (tx, rx) = channel();
@@ -506,6 +508,8 @@ impl Seat {
     /// Once a frame: starts the service's client on first use, asks whether the account owns a
     /// cosmetic, and tells the service what the account shows.
     fn frame(&mut self) {
+        #[cfg(target_arch = "wasm32")]
+        return;
         if self.client.is_none() {
             let (client, local) = Cosmetics::client();
             self.client = Some(Arc::new(client));

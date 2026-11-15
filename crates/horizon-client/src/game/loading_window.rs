@@ -80,10 +80,9 @@ pub(super) fn build_renderer(
         shader_pack.frame(),
         display,
     ))?;
-    // The loading renderer may have been built before the saved graphics settings were
-    // adopted. Configure the world swapchain before its first gameplay frame instead of
-    // waiting for `Game::apply_settings` after the handoff.
+    log::info!("Horizon: loading_window: Renderer::new block_on completed");
     renderer.set_present_mode(vsync, settings.present_mode);
+    log::info!("Horizon: loading_window: set_present_mode completed");
     renderer.hud.sprite_animations = atlas
         .sprite_animations
         .iter()
@@ -92,8 +91,10 @@ pub(super) fn build_renderer(
     renderer
         .hud
         .set_text_shader(&renderer.device, atlas.text_shaders.gui.as_deref());
+    log::info!("Horizon: loading_window: prepare_glint_atlas starting");
     pack.item_renderer
         .prepare_glint_atlas(renderer.device.limits().max_texture_dimension_2d, filtering)?;
+    log::info!("Horizon: loading_window: prepare_glint_atlas completed");
     renderer.set_lines_shader(atlas.lines_shader.as_deref());
     renderer.set_world_text_shaders(&atlas.text_shaders);
     renderer.set_sky_shaders(atlas.sky_shader.as_deref(), atlas.stars_shader.as_deref());
@@ -103,6 +104,7 @@ pub(super) fn build_renderer(
     renderer
         .hud
         .set_cit_glints(&renderer.device, &renderer.queue, cit_glints);
+    log::info!("Horizon: loading_window: build_renderer returning Ok(renderer)");
     Ok(renderer)
 }
 
@@ -420,7 +422,7 @@ pub(super) fn start_game<'a>(
             title.last_server = game.settings.file.string("lastServer");
             title.skip_multiplayer_warning = game.settings.file.bool("skipMultiplayerWarning");
             // Gui.addInitialScreens: the accessibility onboarding comes first.
-            if game.settings.file.bool("onboardAccessibility") {
+            if false && game.settings.file.bool("onboardAccessibility") {
                 title.start_onboarding();
             }
             game.title = Some(title);

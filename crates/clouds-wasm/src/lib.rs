@@ -29,7 +29,7 @@ impl log::Log for ConsoleLogger {
             match record.level() {
                 log::Level::Error => {
                     error(&msg);
-                    clouds_on_error(&msg);
+                    clouds_on_log("error", &msg);
                 }
                 log::Level::Warn => {
                     warn(&msg);
@@ -291,7 +291,7 @@ pub async fn clouds_start(
     let name = username.unwrap_or_else(|| "Clouds".to_string());
     horizon_client::web_options::set_options(
         Some(name),
-        world_name,
+        None,
         render_distance,
         creative.unwrap_or(false),
     );

@@ -804,6 +804,8 @@ impl AsyncOcclusionCuller {
     }
 
     pub(super) fn new() -> std::io::Result<Self> {
+        #[cfg(target_arch = "wasm32")]
+        return Err(std::io::Error::new(std::io::ErrorKind::Unsupported, "wasm32 has no threads"));
         let (job_tx, job_rx) = mpsc::sync_channel::<CullJob>(1);
         let (plane_tx, plane_rx) = mpsc::sync_channel::<CullJob>(1);
         let (result_tx, result_rx) = mpsc::channel::<CullResults>();

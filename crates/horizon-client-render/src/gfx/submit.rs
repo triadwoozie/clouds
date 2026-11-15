@@ -16,6 +16,8 @@ use std::time::{Duration, Instant};
 /// macOS's Metal it stalled: offscreen at render distance 12, a tenth to a half of the frame rate
 /// with 20-180 ms p99 frames, against the same binary without it. Windows is not measured yet.
 pub fn wanted() -> bool {
+    #[cfg(target_arch = "wasm32")]
+    return false;
     match std::env::var("HORIZON_SUBMIT_THREAD").as_deref() {
         Ok("0") => false,
         Ok("1") => true,

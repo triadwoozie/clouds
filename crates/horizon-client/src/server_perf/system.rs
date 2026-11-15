@@ -78,6 +78,8 @@ impl BackgroundProbe {
     pub(super) fn spawn() -> Self {
         let (requests, wanted) = std::sync::mpsc::channel::<(f64, WorldCounts)>();
         let latest = std::sync::Arc::new(std::sync::Mutex::new(Gauges::default()));
+        #[cfg(target_arch = "wasm32")]
+        return Self { requests, latest };
         let shared = std::sync::Arc::clone(&latest);
         let worker = std::thread::Builder::new()
             .name("horizon-perf-gauges".into())
@@ -153,6 +155,8 @@ static HARDWARE: OnceLock<horizon_bench::Hardware> = OnceLock::new();
 
 /// Describes the hardware on a thread of its own: the probes run commands, which the tick must not wait for.
 pub fn warm_hardware() {
+    #[cfg(target_arch = "wasm32")]
+    return;
     std::thread::spawn(|| {
         HARDWARE.get_or_init(horizon_bench::Hardware::detect);
     });

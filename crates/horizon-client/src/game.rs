@@ -11261,6 +11261,7 @@ impl Game<'_> {
                                 self.started.elapsed().as_millis()
                             );
                         }
+                        log::info!("Horizon: frame {} completed draw, perf.title_shown", self.frames);
                         if self.title.is_some() {
                             self.perf.title_shown();
                         } else if self.screen == Screen::Playing && self.player.is_some() {
@@ -11300,6 +11301,10 @@ impl Game<'_> {
                                 .is_some_and(|f| self.world_frames >= f)
                         {
                             event_loop.exit();
+                        }
+                        #[cfg(target_arch = "wasm32")]
+                        if let Some(w) = &self.window {
+                            w.request_redraw();
                         }
                     }
                 }

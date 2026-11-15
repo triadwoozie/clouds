@@ -1089,7 +1089,7 @@ impl NativePost {
                 multiview_mask: None,
                 cache: None,
             });
-            if let Some(e) = pollster::block_on(scope.pop()) {
+            if let Some(e) = crate::gfx::pop_scope(scope) {
                 return Err(format!("{}: {e}", stage.file));
             }
             passes.push((stage.label, pipeline));
@@ -1116,7 +1116,7 @@ impl NativePost {
                 );
                 let pipeline =
                     fullscreen_pipeline(device, "Tonemap", &module, entries, format, &present);
-                if let Some(e) = pollster::block_on(scope.pop()) {
+                if let Some(e) = crate::gfx::pop_scope(scope) {
                     return Err(format!("{file}: {e}"));
                 }
                 Some(Display {

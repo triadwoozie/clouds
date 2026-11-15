@@ -144,8 +144,8 @@ impl Part {
             multiview_mask: None,
             cache: None,
         });
-        let internal = pollster::block_on(internal.pop());
-        if let Some(e) = internal.or(pollster::block_on(validation.pop())) {
+        let internal = crate::gfx::pop_scope(internal);
+        if let Some(e) = internal.or(crate::gfx::pop_scope(validation)) {
             log::warn!("the resource pack's {name} shader is not used: {e}");
             return None;
         }

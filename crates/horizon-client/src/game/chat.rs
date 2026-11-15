@@ -771,6 +771,8 @@ impl Game<'_> {
     /// built them in its frame (20 ms of the Join click on an M4 Pro). Whoever needs one
     /// before it is done waits for it, as before.
     pub(super) fn preload_registries(&self) {
+        #[cfg(target_arch = "wasm32")]
+        return;
         if self.options.dedicated.is_some() {
             return;
         }

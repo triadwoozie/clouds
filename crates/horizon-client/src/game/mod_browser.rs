@@ -138,6 +138,8 @@ impl Jobs {
 }
 
 fn spawn(name: &str, work: impl FnOnce() + Send + 'static) {
+    #[cfg(target_arch = "wasm32")]
+    return;
     if let Err(e) = std::thread::Builder::new().name(name.into()).spawn(work) {
         log::warn!("Horizon: {name} did not start: {e}");
     }

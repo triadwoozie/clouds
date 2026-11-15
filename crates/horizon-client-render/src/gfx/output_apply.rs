@@ -294,8 +294,11 @@ impl Renderer {
                 hdr
             }
         };
-        let memory = pollster::block_on(memory.pop());
-        if let Some(e) = memory.or(pollster::block_on(validation.pop())) {
+        #[cfg(target_arch = "wasm32")]
+        let (memory, validation): (Option<wgpu::Error>, Option<wgpu::Error>) = (None, None);
+        #[cfg(not(target_arch = "wasm32"))]
+        let (memory, validation) = (pollster::block_on(memory.pop()), pollster::block_on(validation.pop()));
+        if let Some(e) = memory.or(validation) {
             return Err(e.to_string());
         }
         // The metadata the swapchain's configuration sends.

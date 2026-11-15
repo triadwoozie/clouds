@@ -101,6 +101,12 @@ impl Faces {
 /// The faces' files decoded, side by side, into one array of six layers of
 /// equal squares.
 fn decode_faces(files: &[Vec<u8>]) -> Result<(u32, Vec<u8>)> {
+    #[cfg(target_arch = "wasm32")]
+    let decoded: Vec<_> = files
+        .iter()
+        .map(|file| decode_bytes(file).map_err(|e| e.to_string()))
+        .collect();
+    #[cfg(not(target_arch = "wasm32"))]
     let decoded: Vec<_> = std::thread::scope(|scope| {
         let threads: Vec<_> = files
             .iter()
@@ -151,7 +157,9 @@ fn load_face(
         if tried.first().is_some_and(|(seen, _)| *seen == path) {
             continue;
         }
-        let read = std::fs::read(&path)
+        let read = horizon_core::prepared_files::read(&path)
+            .or_else(|_| horizon_core::prepared_files::read(&Path::new(BACKGROUND).join(&name)))
+            .or_else(|_| std::fs::read(&path))
             .map_err(|e| e.to_string())
             .and_then(|file| {
                 let image = decode_bytes(&file).map_err(|e| e.to_string())?;

@@ -304,8 +304,8 @@ impl Post {
                 multiview_mask: None,
                 cache: None,
             });
-            let internal = pollster::block_on(internal.pop());
-            match internal.or(pollster::block_on(validation.pop())) {
+            let internal = crate::gfx::pop_scope(internal);
+            match internal.or(crate::gfx::pop_scope(validation)) {
                 None => {
                     let uniform = device.create_buffer(&wgpu::BufferDescriptor {
                         label: Some("Horizon TAA"),
@@ -474,7 +474,7 @@ impl Post {
             let validation = device.push_error_scope(wgpu::ErrorFilter::Validation);
             let memory = device.push_error_scope(wgpu::ErrorFilter::OutOfMemory);
             let target = self.build_target(device, size, history_size);
-            let error = pollster::block_on(memory.pop()).or(pollster::block_on(validation.pop()));
+            let error = crate::gfx::pop_scope(memory).or(crate::gfx::pop_scope(validation));
             if error.is_none() {
                 // New textures: no history yet.
                 self.taa_this_frame.jitter[2] = 1.0;

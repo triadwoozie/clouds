@@ -246,6 +246,11 @@ impl Game<'_> {
             return;
         }
         if let Some(w) = &self.window {
+            #[cfg(target_arch = "wasm32")]
+            {
+                w.request_redraw();
+            }
+            #[cfg(not(target_arch = "wasm32"))]
             if self.options.offscreen {
                 // Offscreen frames don't wait for the window to be drawn: an
                 // occluded window (a locked macOS session) gets no redraws.
@@ -284,6 +289,7 @@ impl ApplicationHandler for Game<'_> {
         if self.window.is_some() {
             return;
         }
+        log::info!("Horizon: Game::resumed entered");
         debug_keys::warm_debug_cpu();
         // The Window constructor: created fullscreen when options.txt or --fullscreen says so.
         let fullscreen = self.settings.fullscreen || self.options.fullscreen;
@@ -339,20 +345,25 @@ impl ApplicationHandler for Game<'_> {
         horizon_client::telemetry::note_display(&window);
         match self.new_renderer(window.clone()) {
             Ok(r) => {
+                log::info!("Horizon: new_renderer completed successfully");
                 self.renderer = Some(r);
                 self.world_renderer_ready = true;
             }
             Err(e) => {
+                log::error!("Horizon: new_renderer failed: {e}");
                 self.error = Some(e);
                 event_loop.exit();
                 return;
             }
         }
-        self.window = Some(window);
+        self.window = Some(window.clone());
         self.ime_allowed = false;
         self.ime_area = None;
         self.apply_settings();
+        log::info!("Horizon: apply_settings completed");
         self.previous = Instant::now();
+        window.request_redraw();
+        log::info!("Horizon: window.request_redraw called in resumed");
     }
     fn window_event(&mut self, event_loop: &ActiveEventLoop, id: WindowId, event: WindowEvent) {
         let key = if self.window.as_ref().is_some_and(|w| w.id() == id)

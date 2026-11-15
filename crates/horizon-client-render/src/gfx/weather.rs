@@ -314,7 +314,7 @@ pub(super) fn native_pipeline(
         multiview_mask: None,
         cache: None,
     });
-    if let Some(e) = pollster::block_on(scope.pop()) {
+    if let Some(e) = crate::gfx::pop_scope(scope) {
         return Err(format!("{}: {e}", stage.file));
     }
     Ok(pipeline)

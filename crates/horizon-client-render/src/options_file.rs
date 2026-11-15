@@ -244,7 +244,7 @@ static TABLE: LazyLock<Vec<Def>> = LazyLock::new(|| {
         b("saveChatDrafts", false),
         u("panoramaScrollSpeed", 1.0),
         b("telemetryOptInExtra", false),
-        pb("onboardAccessibility", true),
+        pb("onboardAccessibility", false),
         i("menuBackgroundBlurriness", 0, 10, 5),
         pb("startedCleanly", true),
         n("musicToast", MUSIC_TOAST, 0),

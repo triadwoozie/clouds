@@ -82,6 +82,7 @@ large_enum_variant = "allow"
 # frame wait for the GPU to finish the one before (#4604).
 # Drop this and the folder once a wgpu release has these fixes.
 [patch.crates-io]
+pollster = { path = "third_party/pollster" }
 wgpu-hal = { path = "third_party/wgpu-hal" }
 # naga 30.0.1, with the fixes to its GLSL frontend that shader packs need (THIRD_PARTY_NOTICES.md).
 naga = { path = "third_party/naga" }
@@ -113,6 +114,7 @@ opt-level = 3
 [profile.release]
 lto = "thin"
 codegen-units = 1
+panic = "abort"
 
 # Optimized but quick-to-link builds for iteration: cargo build --profile fast
 [profile.fast]

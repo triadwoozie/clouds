@@ -2186,6 +2186,19 @@ pub fn set_preloaded_gpu(instance: wgpu::Instance, adapter: wgpu::Adapter, devic
     let _ = PRELOADED_GPU.set((instance, adapter, device, queue));
 }
 
+#[inline]
+pub(crate) fn pop_scope(scope: wgpu::ErrorScopeGuard) -> Option<wgpu::Error> {
+    #[cfg(target_arch = "wasm32")]
+    {
+        let _ = scope;
+        None
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        pollster::block_on(scope.pop())
+    }
+}
+
 /// Opens a device on the first of `backend_order`'s backends that gives one.
 /// Offscreen rendering needs no surface, so it can use a GPU the window's
 /// display cannot present from (a headless compositor).
@@ -2206,7 +2219,11 @@ async fn open_device(
         let configured = match &surface {
             Some(s) => {
                 let caps = s.get_capabilities(adapter);
-                let size = window.inner_size();
+                let mut size = window.inner_size();
+                #[cfg(target_arch = "wasm32")]
+                if size.width <= 1 || size.height <= 1 {
+                    size = winit::dpi::PhysicalSize::new(1280, 720);
+                }
                 let conf = surface_setup::set_up_surface(
                     s,
                     adapter,
@@ -2670,7 +2687,11 @@ impl Renderer {
         let info = adapter.get_info();
         surface_setup::log_sprite_split(&info, split, layers);
         crate::graphics::suggest_reduced_far_detail(crate::graphics::lod_capped(&info));
-        let size = window.inner_size();
+        let mut size = window.inner_size();
+        #[cfg(target_arch = "wasm32")]
+        if size.width <= 1 || size.height <= 1 {
+            size = winit::dpi::PhysicalSize::new(1280, 720);
+        }
         let max_side = device.limits().max_texture_dimension_2d;
         let configured = match (&surface, configured) {
             (Some(_), Some(configured)) => Some(configured),
@@ -4898,6 +4919,7 @@ impl Renderer {
         let world_primitives =
             world_primitives::WorldPrimitives::new(&device, (frame_format, linear_light));
         let screenshot_saves = screenshot_save::Saves::new(&device);
+        log::info!("Horizon renderer: Renderer::new successfully built Self, returning");
         Ok(Self {
             display: None,
             reading: display,
@@ -5162,6 +5184,9 @@ impl Renderer {
             post_effects: None,
             readback: readback::Readback::default(),
             info,
+            #[cfg(target_arch = "wasm32")]
+            suspended: false,
+            #[cfg(not(target_arch = "wasm32"))]
             suspended: !drawable_size(size.width, size.height, max_side),
             acquire_validation_failures: 0,
             surface_unconfigured: false,
@@ -5472,9 +5497,20 @@ impl Renderer {
     }
     /// Follows the window to `width` x `height`. A size the swapchain can't take
     /// ([`drawable_size`]) keeps the last one and draws nothing until the next.
-    pub fn resize(&mut self, width: u32, height: u32) {
+    pub fn resize(&mut self, mut width: u32, mut height: u32) {
+        #[cfg(target_arch = "wasm32")]
+        {
+            if width <= 1 || height <= 1 {
+                width = 1280;
+                height = 720;
+            }
+        }
         let max = self.device.limits().max_texture_dimension_2d;
         self.suspended = !drawable_size(width, height, max);
+        #[cfg(target_arch = "wasm32")]
+        {
+            self.suspended = false;
+        }
         if self.suspended {
             return;
         }
@@ -6836,20 +6872,34 @@ impl Renderer {
         hdr: Option<&hdr::Hdr>,
         device_lost: &std::sync::atomic::AtomicBool,
     ) -> std::result::Result<(), String> {
-        let validation = device.push_error_scope(wgpu::ErrorFilter::Validation);
-        let memory = device.push_error_scope(wgpu::ErrorFilter::OutOfMemory);
-        surface.configure(device, config);
-        let memory = pollster::block_on(memory.pop());
-        if let Some(e) = memory.or(pollster::block_on(validation.pop())) {
-            return Err(e.to_string());
+        #[cfg(target_arch = "wasm32")]
+        {
+            surface.configure(device, config);
+            if device_lost.load(std::sync::atomic::Ordering::Relaxed) {
+                return Err("the graphics device was lost".into());
+            }
+            if let Some(hdr) = hdr {
+                horizon_hdr::set_metadata(device, surface, hdr.declared_peak(), hdr.black);
+            }
+            return Ok(());
         }
-        if device_lost.load(std::sync::atomic::Ordering::Relaxed) {
-            return Err("the graphics device was lost".into());
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            let validation = device.push_error_scope(wgpu::ErrorFilter::Validation);
+            let memory = device.push_error_scope(wgpu::ErrorFilter::OutOfMemory);
+            surface.configure(device, config);
+            let memory = pollster::block_on(memory.pop());
+            if let Some(e) = memory.or(pollster::block_on(validation.pop())) {
+                return Err(e.to_string());
+            }
+            if device_lost.load(std::sync::atomic::Ordering::Relaxed) {
+                return Err("the graphics device was lost".into());
+            }
+            if let Some(hdr) = hdr {
+                horizon_hdr::set_metadata(device, surface, hdr.declared_peak(), hdr.black);
+            }
+            Ok(())
         }
-        if let Some(hdr) = hdr {
-            horizon_hdr::set_metadata(device, surface, hdr.declared_peak(), hdr.black);
-        }
-        Ok(())
     }
     /// Configures the window surface again. One that fails is still the one
     /// wgpu configured before, which acquisition reports as a validation error.
@@ -12371,9 +12421,16 @@ impl GpuChecks {
         Self { memory, validation }
     }
     fn pop(self) -> Option<wgpu::Error> {
-        let validation = pollster::block_on(self.validation.pop());
-        let memory = pollster::block_on(self.memory.pop());
-        memory.or(validation)
+        #[cfg(target_arch = "wasm32")]
+        {
+            None
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            let validation = pollster::block_on(self.validation.pop());
+            let memory = pollster::block_on(self.memory.pop());
+            memory.or(validation)
+        }
     }
 }
 /// How many times the window's size a scaled screenshot is: the Resolution Scale

@@ -397,6 +397,8 @@ pub(super) fn preload_world_data(
     resources: &std::path::Path,
     registry: &'static horizon_world::registry::BlockRegistry,
 ) {
+    #[cfg(target_arch = "wasm32")]
+    return;
     let mut preload = PRELOAD.lock().unwrap_or_else(|e| e.into_inner());
     match &mut *preload {
         Preload::Used => {}
@@ -461,6 +463,8 @@ pub(super) fn preload_launch_world(
     registry: &'static horizon_world::registry::BlockRegistry,
     biomes: Arc<horizon_client::biome::Biomes>,
 ) {
+    #[cfg(target_arch = "wasm32")]
+    return;
     let mut preload = PRELOAD.lock().unwrap_or_else(|e| e.into_inner());
     if !matches!(*preload, Preload::Idle) {
         return;
@@ -520,6 +524,8 @@ fn spawn_sync_preload(
     resources: &std::path::Path,
     behind_server: bool,
 ) -> Option<std::thread::JoinHandle<()>> {
+    #[cfg(target_arch = "wasm32")]
+    return None;
     let resources = resources.to_owned();
     std::thread::Builder::new()
         .name("Sync data preload".into())

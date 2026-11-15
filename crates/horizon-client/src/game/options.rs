@@ -735,17 +735,22 @@ impl Game<'_> {
     /// below 260 frames per second, sleeping then spin-waiting until the
     /// frame's slot ends (not in scripted frame-count runs).
     pub(super) fn limit_frame(&mut self) {
-        if self.options.frames.is_some() || self.options.paced_by_split {
-            return;
-        }
-        let limit = self.framerate_limit();
-        match self.settings.horizon.pacing {
-            horizon_client::graphics::Pacing::Precise => {
-                horizon_client::window::end_frame(&mut self.limiter, limit, &mut self.frame_clock)
+        #[cfg(target_arch = "wasm32")]
+        return;
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            if self.options.frames.is_some() || self.options.paced_by_split {
+                return;
             }
-            horizon_client::graphics::Pacing::Efficient => {
-                let mut clock = horizon_client::window::SleepingClock(self.frame_clock);
-                horizon_client::window::end_frame_on_grid(&mut self.limiter, limit, &mut clock);
+            let limit = self.framerate_limit();
+            match self.settings.horizon.pacing {
+                horizon_client::graphics::Pacing::Precise => {
+                    horizon_client::window::end_frame(&mut self.limiter, limit, &mut self.frame_clock)
+                }
+                horizon_client::graphics::Pacing::Efficient => {
+                    let mut clock = horizon_client::window::SleepingClock(self.frame_clock);
+                    horizon_client::window::end_frame_on_grid(&mut self.limiter, limit, &mut clock);
+                }
             }
         }
     }

@@ -417,6 +417,11 @@ impl Game<'_> {
                 &self.level.enabled_features,
             ),
         };
+        #[cfg(target_arch = "wasm32")]
+        {
+            self.adv.tree = Tree::shared(&data, &horizon_world::loot::PackOverlay { files: &files });
+            return;
+        }
         self.adv.pending_tree = std::thread::Builder::new()
             .name("horizon-advancements".into())
             .spawn(move || Tree::shared(&data, &horizon_world::loot::PackOverlay { files: &files }))
