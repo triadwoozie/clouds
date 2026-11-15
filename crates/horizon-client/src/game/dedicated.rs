@@ -1652,10 +1652,18 @@ impl Game<'_> {
                 .map(|s| horizon_core::geometry::Vec3::new(s[0] + 0.5, s[1], s[2] + 0.5));
             return Ok(());
         }
+        #[cfg(target_arch = "wasm32")]
+        let mut loop_count = 0;
         while self.player.is_none() {
             self.update_world();
             #[cfg(target_arch = "wasm32")]
-            horizon_threads::jobs::pump_jobs();
+            {
+                loop_count += 1;
+                if loop_count % 10 == 0 {
+                    log::info!("Horizon: settle_spawn iteration {loop_count}");
+                }
+                horizon_threads::jobs::pump_jobs();
+            }
             self.spawn_player()?;
             if Instant::now() > deadline {
                 return Err("the spawn area did not load".into());

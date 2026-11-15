@@ -148,6 +148,31 @@ impl Game<'_> {
                 horizon_core::VANILLA_VERSION
             ),
         );
+        #[cfg(target_arch = "wasm32")]
+        {
+            let auth = horizon_client::auth::current();
+            let player_name = auth
+                .as_ref()
+                .map_or_else(|| self.options.player_name(), |a| a.name.clone());
+            let owner = auth
+                .as_ref()
+                .map_or_else(|| horizon_protocol::crypto::offline_uuid(&player_name), |a| a.uuid);
+            let request = world_loading::WorldRequest::new(
+                folder,
+                name,
+                seed,
+                creative,
+                create,
+            )?
+            .owned_by(&player_name, owner);
+            self.load_world(request)?;
+            log::info!("Horizon: world loaded directly on WASM, settling spawn...");
+            self.settle_spawn()?;
+            self.spawn_player()?;
+            log::info!("Horizon: player spawned successfully on WASM!");
+            return Ok(());
+        }
+        #[cfg(not(target_arch = "wasm32"))]
         self.open_integrated(folder, name, seed, creative, create)
     }
 
