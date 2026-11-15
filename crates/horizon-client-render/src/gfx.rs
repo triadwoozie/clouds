@@ -9787,6 +9787,15 @@ impl Renderer {
                 bytemuck::cast_slice(vertices),
             );
         }
+        if self.first_frame == FirstFrame::Submit {
+            log::info!(
+                "Horizon: gfx first frame title={}, hud vertices={}, config={}x{}",
+                frame.title,
+                frame.hud.vertices.len(),
+                self.config.width,
+                self.config.height
+            );
+        }
         self.hud.prepare(
             &self.device,
             &mut self.uploads,

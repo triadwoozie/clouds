@@ -414,6 +414,7 @@ pub(super) fn start_game<'a>(
         }
         None if handoff => {}
         None => {
+            log::info!("Horizon: start_game None => initializing Title");
             let mut title = Title::new(
                 std::env::current_dir()?.join("saves"),
                 &game.options.resources,

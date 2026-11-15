@@ -274,7 +274,8 @@ impl Loading {
             return;
         }
         self.poll_menu_realms(event_loop);
-        if let Some(w) = &self.window {
+        let window = self.window.clone();
+        if let Some(w) = &window {
             #[cfg(target_arch = "wasm32")]
             {
                 self.draw();

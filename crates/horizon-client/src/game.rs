@@ -5903,9 +5903,7 @@ impl Game<'_> {
             return batch;
         }
         if self.title.is_some() {
-            // TitleScreen.extractRenderState, then ToastManager over it: vanilla
-            // draws the toast manager on every screen, so a pack download or a
-            // resource-reload failure still shows on the title (#4428).
+            log::info!("Horizon: hud() title is_some, batch vertices before={}", batch.vertices.len());
             if let Some(title) = &self.title {
                 title.draw_with_items(
                     &self.gui.atlas,
@@ -5916,6 +5914,7 @@ impl Game<'_> {
                     self.settings.file.bool("hideServerAddress"),
                 );
             }
+            log::info!("Horizon: hud() title drawn, batch vertices after={}", batch.vertices.len());
             // ScreenEvent.Render.Post over the title's own screens: a mod draws
             // over them here (a pack browser over Create New World, say), and the
             // toasts still come after, as over any screen.
@@ -11056,6 +11055,9 @@ impl Game<'_> {
                     self.mapped_key_event(key, event.state == ElementState::Pressed, event.repeat)?;
                 }
                 WindowEvent::RedrawRequested => {
+                    if self.frames < 3 {
+                        log::info!("Horizon: RedrawRequested frame {}, title is_some={}", self.frames, self.title.is_some());
+                    }
                     horizon_client::spans::time("recover_device", || self.recover_device())?;
                     self.observe_fullscreen();
                     self.sync_ime();

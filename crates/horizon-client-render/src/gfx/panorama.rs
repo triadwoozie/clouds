@@ -381,8 +381,10 @@ impl Panorama {
     /// Draw the cube `prepare` made for this frame.
     pub(super) fn draw(&self, pass: &mut wgpu::RenderPass<'_>) {
         let Some(cube) = &self.cube else {
+            log::warn!("Horizon: Panorama::draw cube is None!");
             return;
         };
+        log::info!("Horizon: Panorama::draw cube is Some, drawing 36 vertices");
         pass.set_pipeline(&self.pipeline);
         pass.set_bind_group(0, cube, &[]);
         pass.draw(0..36, 0..1);
