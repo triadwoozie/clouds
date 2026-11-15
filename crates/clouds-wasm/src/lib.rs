@@ -69,8 +69,8 @@ pub extern "C" fn __clouds_fs_read(path_ptr: *const u8, path_len: usize, out_len
     let clean_str = path_str.trim_start_matches('.').trim_start_matches('/');
     let clean = std::path::Path::new(clean_str);
 
-    let bytes = horizon_core::prepared_files::read(path)
-        .or_else(|_| horizon_core::prepared_files::read(clean));
+    let bytes = horizon_core::prepared_files::read(clean)
+        .or_else(|_| horizon_core::prepared_files::read(path));
 
     if let Ok(bytes) = bytes {
         let len = bytes.len();
@@ -216,6 +216,10 @@ pub fn clouds_vfs_write(path: String, data: Vec<u8>) -> Result<(), JsValue> {
                 error(&format!("[Clouds] Failed to parse horizon-data.bin: {e}"));
             }
         }
+    }
+    let clean = path.trim_start_matches('.').trim_start_matches('/').to_string();
+    if clean != path {
+        horizon_core::prepared_files::vfs_write(&clean, data.clone());
     }
     horizon_core::prepared_files::vfs_write(&path, data);
     Ok(())

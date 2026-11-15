@@ -143,8 +143,8 @@ html, body {
 #clouds-canvas {
   position: fixed;
   inset: 0;
-  width: 100%;
-  height: 100%;
+  width: 100% !important;
+  height: 100% !important;
   display: block;
   outline: none;
   z-index: var(--z-base);
@@ -1515,8 +1515,9 @@ body.pointer-locked .hud-bar {
   async function detectCachedAssets() {
     let hasHorizon = await vfs.fileExists('horizon-data.bin');
     let hasPanorama = await vfs.fileExists('assets/minecraft/textures/gui/title/background/panorama_0.png');
+    let hasWorldgen = await vfs.fileExists('worldgen/block_flags.json');
 
-    if (!hasHorizon || !hasPanorama) {
+    if (!hasHorizon || !hasPanorama || !hasWorldgen) {
       try {
         const resp = await fetch('./resources.zip');
         if (resp.ok) {
@@ -1524,6 +1525,7 @@ body.pointer-locked .hud-bar {
           await ingestResourcesZip(blob);
           hasHorizon = await vfs.fileExists('horizon-data.bin');
           hasPanorama = await vfs.fileExists('assets/minecraft/textures/gui/title/background/panorama_0.png');
+          hasWorldgen = await vfs.fileExists('worldgen/block_flags.json');
         }
       } catch (_) {}
     }

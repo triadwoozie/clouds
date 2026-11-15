@@ -384,7 +384,12 @@ pub struct BlockTableFile<'r> {
 impl<'r> BlockTableFile<'r> {
     /// [`Self::read`] of the file at `path`.
     pub fn open(path: &std::path::Path, registry: &'r BlockRegistry) -> io::Result<Self> {
-        let bytes = std::fs::read(path)?;
+        let bytes = horizon_core::prepared_files::read(path)
+            .or_else(|_| {
+                let clean = path.to_str().unwrap_or("").trim_start_matches('.').trim_start_matches('/');
+                horizon_core::prepared_files::read(std::path::Path::new(clean))
+            })
+            .or_else(|_| std::fs::read(path))?;
         Self::read(&bytes, registry).map_err(|e| invalid(format!("{}: {e}", path.display())))
     }
     /// Reads `bytes`, checking every `states` list of the root compound and

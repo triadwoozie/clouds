@@ -387,12 +387,20 @@ pub fn find(path: &Path) -> Option<(Arc<PreparedFiles>, String)> {
 /// asking the disk: a texture's `.mcmeta` or LabPBR maps, mostly absent);
 /// else from the disk.
 pub fn read(path: &Path) -> io::Result<Vec<u8>> {
+    let clean = path.to_str().unwrap_or("").trim_start_matches('.').trim_start_matches('/');
+    if let Some(files) = global_prepared() {
+        if holds_file(clean) {
+            if let Some(res) = files.read(clean) {
+                return res;
+            }
+        }
+    }
     match find(path) {
         Some((files, rel)) if holds_file(&rel) => files
             .read(&rel)
             .unwrap_or_else(|| Err(io::ErrorKind::NotFound.into())),
         _ => {
-            if let Some(bytes) = vfs_read(path) {
+            if let Some(bytes) = vfs_read(path).or_else(|| vfs_read(Path::new(clean))) {
                 Ok(bytes)
             } else {
                 #[cfg(target_arch = "wasm32")]

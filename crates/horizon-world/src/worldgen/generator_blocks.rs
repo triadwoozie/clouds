@@ -98,7 +98,10 @@ impl BlockBehavior {
         tags: &BTreeMap<String, Vec<String>>,
         fluid_tags: &BTreeMap<String, Vec<String>>,
     ) -> Result<Option<Self>, GeneratorError> {
-        if !dir.join("block-properties.nbt").exists() {
+        let prop_path = dir.join("block-properties.nbt");
+        let exists = horizon_core::prepared_files::vfs_exists(prop_path.to_str().unwrap_or(""))
+            || prop_path.exists();
+        if !exists {
             return Ok(None);
         }
         let read = |name: &str| -> Result<BlockTableFile<'static>, GeneratorError> {
@@ -106,7 +109,15 @@ impl BlockBehavior {
                 .map_err(|e| resource(format!("{name}: {e}")))
         };
         let json = |name: &str| -> Result<Value, GeneratorError> {
-            Ok(serde_json::from_str(&fs::read_to_string(dir.join(name))?)?)
+            let path = dir.join(name);
+            let text = horizon_core::prepared_files::read_to_string(&path)
+                .or_else(|_| {
+                    let clean = path.to_str().unwrap_or("").trim_start_matches('.').trim_start_matches('/');
+                    horizon_core::prepared_files::read_to_string(Path::new(clean))
+                })
+                .or_else(|_| fs::read_to_string(&path))
+                .map_err(|e| resource(format!("{name}: {e}")))?;
+            Ok(serde_json::from_str(&text)?)
         };
         // The support table reads on its own thread while the collision and
         // property tables (which need the collisions) read on this one.

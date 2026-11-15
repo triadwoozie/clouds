@@ -322,9 +322,10 @@ impl ApplicationHandler for Game<'_> {
         };
         // `--offscreen` renders into a texture: its window would only show white.
         let window_step = startup::step("window.create");
+        #[cfg(not(target_arch = "wasm32"))]
+        let attributes = attributes.with_inner_size(winit::dpi::LogicalSize::new(size[0], size[1]));
         let window = match event_loop.create_window(
             attributes
-                .with_inner_size(winit::dpi::LogicalSize::new(size[0], size[1]))
                 .with_fullscreen(fullscreen.then_some(winit::window::Fullscreen::Borderless(None)))
                 .with_visible(!self.options.offscreen)
                 .with_active(!agent_started),

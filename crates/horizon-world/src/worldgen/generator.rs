@@ -230,8 +230,13 @@ fn read_bundle(
     name: &str,
 ) -> Result<Bundle, GeneratorError> {
     let path = dir.join(format!("{name}.json"));
-    let text =
-        fs::read_to_string(&path).map_err(|e| resource(format!("{}: {e}", path.display())))?;
+    let text = horizon_core::prepared_files::read_to_string(&path)
+        .or_else(|_| {
+            let clean = path.to_str().unwrap_or("").trim_start_matches('.').trim_start_matches('/');
+            horizon_core::prepared_files::read_to_string(Path::new(clean))
+        })
+        .or_else(|_| fs::read_to_string(&path))
+        .map_err(|e| resource(format!("{}: {e}", path.display())))?;
     Ok(overrides.apply(name, serde_json::from_str(&text)?))
 }
 fn read_optional_bundle(
@@ -239,10 +244,9 @@ fn read_optional_bundle(
     overrides: &WorldgenOverrides,
     name: &str,
 ) -> Result<Option<Bundle>, GeneratorError> {
-    if dir.join(format!("{name}.json")).exists() {
-        read_bundle(dir, overrides, name).map(Some)
-    } else {
-        Ok(None)
+    match read_bundle(dir, overrides, name) {
+        Ok(b) => Ok(Some(b)),
+        Err(_) => Ok(None),
     }
 }
 /// The tags of the bundle `name`, the data packs' tag files after the
@@ -368,8 +372,15 @@ impl GeneratorData {
         ov: &WorldgenOverrides,
     ) -> Result<Arc<Self>, GeneratorError> {
         let mut warnings = Vec::new();
-        let flags: Vec<(bool, bool)> =
-            serde_json::from_str(&fs::read_to_string(dir.join("block_flags.json"))?)?;
+        let flags_path = dir.join("block_flags.json");
+        let flags_text = horizon_core::prepared_files::read_to_string(&flags_path)
+            .or_else(|_| {
+                let clean = flags_path.to_str().unwrap_or("").trim_start_matches('.').trim_start_matches('/');
+                horizon_core::prepared_files::read_to_string(Path::new(clean))
+            })
+            .or_else(|_| fs::read_to_string(&flags_path))
+            .map_err(|e| resource(format!("{}: {e}", flags_path.display())))?;
+        let flags: Vec<(bool, bool)> = serde_json::from_str(&flags_text)?;
         if flags.len() != registry.len() {
             return Err(resource("block_flags.json does not match the registry"));
         }
@@ -404,7 +415,14 @@ impl GeneratorData {
         let structures = loading({
             let (dir, tags, ov) = (dir.to_owned(), block_tags.clone(), ov.clone());
             move || -> Result<_, GeneratorError> {
-                let Ok(json) = fs::read_to_string(dir.join("blocks/structure-blocks.json")) else {
+                let sb_path = dir.join("blocks/structure-blocks.json");
+                let sb_text = horizon_core::prepared_files::read_to_string(&sb_path)
+                    .or_else(|_| {
+                        let clean = sb_path.to_str().unwrap_or("").trim_start_matches('.').trim_start_matches('/');
+                        horizon_core::prepared_files::read_to_string(Path::new(clean))
+                    })
+                    .or_else(|_| fs::read_to_string(&sb_path));
+                let Ok(json) = sb_text else {
                     return Ok(None);
                 };
                 Ok(Some(Arc::new(
@@ -466,19 +484,36 @@ impl GeneratorData {
         )?;
         let mut presets = read_optional_bundle(dir, ov, "presets")?.unwrap_or_default();
         let reports = dir.join("biome_parameters");
-        if reports.is_dir() {
-            for entry in fs::read_dir(&reports)? {
-                let path = entry?.path();
-                let Some(stem) = path
-                    .file_stem()
-                    .and_then(|s| s.to_str())
-                    .filter(|_| path.extension().is_some_and(|e| e == "json"))
-                else {
-                    continue;
-                };
-                presets
-                    .entry(format!("minecraft:{stem}"))
-                    .or_insert(quantize_parameter_report(&fs::read_to_string(&path)?)?);
+        let mut report_files: Vec<std::path::PathBuf> = Vec::new();
+        for name in horizon_core::prepared_files::list_dir(&reports) {
+            report_files.push(reports.join(name));
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        if report_files.is_empty() && reports.is_dir() {
+            if let Ok(rd) = fs::read_dir(&reports) {
+                for entry in rd.flatten() {
+                    report_files.push(entry.path());
+                }
+            }
+        }
+        for path in report_files {
+            let Some(stem) = path
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .filter(|_| path.extension().is_some_and(|e| e == "json"))
+            else {
+                continue;
+            };
+            if let Ok(text) = horizon_core::prepared_files::read_to_string(&path)
+                .or_else(|_| {
+                    let clean = path.to_str().unwrap_or("").trim_start_matches('.').trim_start_matches('/');
+                    horizon_core::prepared_files::read_to_string(Path::new(clean))
+                })
+                .or_else(|_| fs::read_to_string(&path))
+            {
+                if let Ok(report) = quantize_parameter_report(&text) {
+                    presets.entry(format!("minecraft:{stem}")).or_insert(report);
+                }
             }
         }
         let source_catalog =
