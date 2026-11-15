@@ -4,4 +4,11 @@
 xtask = "run --package xtask --"
 
 [target.wasm32-unknown-unknown]
-rustflags = ["--cfg", "wasm_js", "--cfg", "getrandom_backend=\"wasm_js\""]
+rustflags = [
+    "--cfg", "wasm_js",
+    "--cfg", "getrandom_backend="wasm_js"",
+    "-C", "target-feature=+simd128",
+    "-C", "link-arg=-zstack-size=16777216",
+    "-C", "link-arg=--initial-memory=67108864",
+    "-C", "link-arg=--max-memory=2147483648"
+]

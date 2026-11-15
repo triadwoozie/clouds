@@ -53,7 +53,7 @@ pub(super) fn build_renderer(
     // Made here when the worker did not: the renderer's own fallback has no LabPBR maps.
     let prepared = Some(prepared.unwrap_or_else(|| prepare_renderer_textures(pack)));
     let atlas_pixels = atlas.pixels();
-    let mut renderer = pollster::block_on(Renderer::new(
+    let mut renderer = pollster::block_on(Box::pin(Renderer::new(
         window,
         offscreen,
         &assets.pixels.get(),
@@ -79,7 +79,7 @@ pub(super) fn build_renderer(
         settings,
         shader_pack.frame(),
         display,
-    ))?;
+    )))?;
     log::info!("Horizon: loading_window: Renderer::new block_on completed");
     renderer.set_present_mode(vsync, settings.present_mode);
     log::info!("Horizon: loading_window: set_present_mode completed");
@@ -125,6 +125,9 @@ pub(super) fn loading_renderer(
     let panorama = panorama
         .cloned()
         .unwrap_or_else(|| Arc::new(horizon_client::gfx::panorama::Faces::colour([0; 4])));
+    if let Some(a) = atlas {
+        log::info!("Horizon: loading_window atlas dims {}x{}, pixels len {}", a.width, a.height, a.pixels.len());
+    }
     let pixels_cow = atlas.map(|a| a.pixels());
     let (pixels, width, height) = match (&pixels_cow, atlas) {
         (Some(cow), Some(a)) => (cow.as_ref(), a.width, a.height),
@@ -145,7 +148,7 @@ pub(super) fn loading_renderer(
         atlas.font.reset_cache();
     }
     log::info!("Horizon: loading_window calling Renderer::new with previous.is_some = {}", previous.is_some());
-    let mut renderer = pollster::block_on(Renderer::new(
+    let mut renderer = pollster::block_on(Box::pin(Renderer::new(
         window,
         offscreen,
         &[255, 255, 255, 255],
@@ -169,7 +172,7 @@ pub(super) fn loading_renderer(
         &horizon_client::graphics::Graphics::default(),
         Default::default(),
         previous.map(|r| r.display_reading()).unwrap_or_default(),
-    ))?;
+    )))?;
     log::info!("Horizon: loading_window successfully returned from Renderer::new");
     if let Some(atlas) = atlas {
         renderer.hud.sprite_animations = atlas
