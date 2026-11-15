@@ -86,11 +86,10 @@ impl Game<'_> {
         if !title.preparing() {
             return;
         }
-        if self.creation_job.is_none() {
+        #[cfg(target_arch = "wasm32")]
+        {
             let dir = self.options.resources.join("worldgen");
             let registry = self.pack.assets.registry;
-            // The chosen packs' worldgen over the game's own:
-            // `applyNewPackConfig` reloads with the new pack config.
             let overrides = title
                 .creation_packs()
                 .map(|(dir, packs)| {
@@ -102,45 +101,85 @@ impl Game<'_> {
                     )
                 })
                 .unwrap_or_default();
-            self.creation_job = std::thread::Builder::new()
-                .name("world-creation".into())
-                .spawn(move || {
-                    horizon_client::vanillagen::shared_data_with(&dir, &overrides, registry)
-                        .map(|_| ())
-                        .map_err(|e| e.to_string())
-                })
-                .ok();
+            let outcome = horizon_client::vanillagen::shared_data_with(&dir, &overrides, registry)
+                .map(|_| ())
+                .map_err(|e| e.to_string());
+            if let Some(title) = self.title.as_mut() {
+                match outcome {
+                    Ok(()) => title.finish_preparing(),
+                    Err(e) => {
+                        log::warn!("Horizon: preparing world creation failed: {e}");
+                        title.finish_preparing();
+                        title.failed(format!(
+                            "{}: {e}",
+                            horizon_client::lang::get_or(
+                                "createWorld.preparing",
+                                "Preparing for world creation..."
+                            )
+                        ));
+                    }
+                }
+            }
             return;
         }
-        if !self
-            .creation_job
-            .as_ref()
-            .is_none_or(std::thread::JoinHandle::is_finished)
+        #[cfg(not(target_arch = "wasm32"))]
         {
-            return;
-        }
-        let outcome = self.creation_job.take().and_then(|job| job.join().ok());
-        if let Some(title) = self.title.as_mut() {
-            match outcome {
-                Some(Ok(())) => title.finish_preparing(),
-                // `applyNewPackConfig`'s failure: back out of the read with
-                // the message, the Create screen's options intact.
-                outcome => {
-                    let e = outcome
-                        .and_then(|r| r.err())
-                        .unwrap_or_else(|| "the read never ran".to_owned());
-                    log::warn!("Horizon: preparing world creation failed: {e}");
-                    // Clear the flag first: `failed` sets the error screen
-                    // with Create as its back target, which
-                    // `finish_preparing` would replace with a fresh world.
-                    title.finish_preparing();
-                    title.failed(format!(
-                        "{}: {e}",
-                        horizon_client::lang::get_or(
-                            "createWorld.preparing",
-                            "Preparing for world creation..."
+            if self.creation_job.is_none() {
+                let dir = self.options.resources.join("worldgen");
+                let registry = self.pack.assets.registry;
+                // The chosen packs' worldgen over the game's own:
+                // `applyNewPackConfig` reloads with the new pack config.
+                let overrides = title
+                    .creation_packs()
+                    .map(|(dir, packs)| {
+                        world_loading::creation_worldgen_overrides(
+                            dir.as_deref(),
+                            &self.options.resources,
+                            &packs,
+                            self.res.biomes(),
                         )
-                    ));
+                    })
+                    .unwrap_or_default();
+                self.creation_job = std::thread::Builder::new()
+                    .name("world-creation".into())
+                    .spawn(move || {
+                        horizon_client::vanillagen::shared_data_with(&dir, &overrides, registry)
+                            .map(|_| ())
+                            .map_err(|e| e.to_string())
+                    })
+                    .ok();
+                return;
+            }
+            if !self
+                .creation_job
+                .as_ref()
+                .is_none_or(std::thread::JoinHandle::is_finished)
+            {
+                return;
+            }
+            let outcome = self.creation_job.take().and_then(|job| job.join().ok());
+            if let Some(title) = self.title.as_mut() {
+                match outcome {
+                    Some(Ok(())) => title.finish_preparing(),
+                    // `applyNewPackConfig`'s failure: back out of the read with
+                    // the message, the Create screen's options intact.
+                    outcome => {
+                        let e = outcome
+                            .and_then(|r| r.err())
+                            .unwrap_or_else(|| "the read never ran".to_owned());
+                        log::warn!("Horizon: preparing world creation failed: {e}");
+                        // Clear the flag first: `failed` sets the error screen
+                        // with Create as its back target, which
+                        // `finish_preparing` would replace with a fresh world.
+                        title.finish_preparing();
+                        title.failed(format!(
+                            "{}: {e}",
+                            horizon_client::lang::get_or(
+                                "createWorld.preparing",
+                                "Preparing for world creation..."
+                            )
+                        ));
+                    }
                 }
             }
         }

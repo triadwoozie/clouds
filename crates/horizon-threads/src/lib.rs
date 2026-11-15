@@ -76,6 +76,9 @@ use std::sync::{
 pub fn worker_count() -> usize {
     static COUNT: OnceLock<usize> = OnceLock::new();
     *COUNT.get_or_init(|| {
+        if cfg!(target_arch = "wasm32") {
+            return 1;
+        }
         parse_worker_count(std::env::var("HORIZON_WORKER_THREADS").ok())
             .unwrap_or_else(|| std::thread::available_parallelism().map_or(1, |n| n.get()))
     })

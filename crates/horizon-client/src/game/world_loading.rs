@@ -76,7 +76,7 @@ impl WorldRequest {
         };
         // Bone meal's and saplings' features, over the plain worldgen bundle.
         let live_features = || growth::install_live_features(res, pack, options);
-        if res.threads() <= 1 {
+        if cfg!(target_arch = "wasm32") || res.threads() <= 1 {
             loot();
             let prepared = self.prepare_world(res, pack, options, settings, upgrade)?;
             live_features();
@@ -586,6 +586,8 @@ pub(super) fn world_data_used() {
 /// connection is made, so the game thread never waits on them (~0.6 s on a
 /// phone). Kept from then on, as a local world keeps them.
 pub(super) fn preload_server_loot(resources: &std::path::Path) {
+    #[cfg(target_arch = "wasm32")]
+    return;
     world_data_used();
     if horizon_client::structure_blocks::loaded_loot_data().is_some() {
         return;

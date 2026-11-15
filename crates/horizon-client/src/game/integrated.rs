@@ -1439,6 +1439,7 @@ pub(super) fn tick_wasm_integrated_server() -> Result<()> {
         if flags.stop.load(Ordering::Relaxed) {
             return Ok(());
         }
+        horizon_threads::jobs::pump_jobs();
         server.run_tasks();
         if server.agent.hold_server {
             return Ok(());
