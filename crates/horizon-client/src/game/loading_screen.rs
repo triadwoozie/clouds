@@ -226,18 +226,26 @@ impl Loading {
             "Horizon: loading the title artwork after {} ms",
             self.started.elapsed().as_millis()
         );
+        log::info!("Horizon: set_ui step 1: set_root");
         self.menu.set_root(root, &self.settings);
+        log::info!("Horizon: set_ui step 2: store gui");
         self.gui = Some(gui);
         self.title_drawn = false;
+        log::info!("Horizon: set_ui step 3: reset_atlas");
         horizon_client::ui_theme::reset_atlas();
+        log::info!("Horizon: set_ui step 4: apply_menu_settings");
         self.apply_menu_settings();
+        log::info!("Horizon: set_ui step 5: check window");
         let Some(window) = self.window.clone() else {
+            log::warn!("Horizon: set_ui window is None!");
             return;
         };
         let offscreen = self.options.as_ref().is_some_and(|o| o.offscreen);
         if let Some(renderer) = &mut self.renderer {
+            log::info!("Horizon: set_ui step 6: release_surface");
             renderer.release_surface();
         }
+        log::info!("Horizon: set_ui step 7: call loading_renderer");
         let bundle = self.gui.as_ref().expect("the menu bundle was just set");
         let _step = startup::step("renderer.title_artwork");
         match loading_renderer(
@@ -249,18 +257,24 @@ impl Loading {
             self.settings.horizon.api,
         ) {
             Ok(r) => {
+                log::info!("Horizon: title artwork renderer built successfully");
                 horizon_client::hud::GUI_SCALE.store(self.settings.gui_scale, Ordering::Relaxed);
                 self.renderer = Some(r);
             }
-            Err(e) => self.error = Some(e),
+            Err(e) => {
+                log::error!("Horizon: loading title artwork renderer failed: {e}");
+                self.error = Some(e);
+            }
         }
         // The title frame's wait starts once its renderer is built.
         self.ui_at = Some(Instant::now());
+        log::info!("Horizon: set_ui complete!");
     }
     pub(super) fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
         // The loop may run once more after exit(): keep the first error, the
         // one that ended loading.
-        if self.error.is_some() {
+        if let Some(e) = &self.error {
+            log::error!("Horizon: loading screen aborting in about_to_wait due to error: {e}");
             event_loop.exit();
             return;
         }
@@ -270,6 +284,7 @@ impl Loading {
             return;
         }
         if let Err(error) = self.poll_menu_resources() {
+            log::error!("Horizon: poll_menu_resources failed: {error}");
             self.error = Some(error);
             event_loop.exit();
             return;
@@ -314,7 +329,7 @@ impl Loading {
             match renderer.render(&frame) {
                 Ok(true) if self.gui.is_some() && self.menu.pending.is_none() => {
                     self.title_drawn = true;
-                    self.menu.perf.title_shown()
+                    self.menu.perf.title_shown();
                 }
                 Ok(_) => {}
                 Err(e) => log::warn!("Horizon: loading screen frame failed: {e}"),
@@ -464,7 +479,8 @@ impl ApplicationHandler for App {
             }
             App::Loading(loading) => {
                 loading.about_to_wait(event_loop);
-                if loading.error.is_some() {
+                if let Some(e) = &loading.error {
+                    log::error!("Horizon: App::Loading error: {e}");
                     event_loop.exit();
                     return;
                 }
@@ -474,11 +490,20 @@ impl ApplicationHandler for App {
                     loading.loaded.take()
                 } {
                     None => Step::Waiting,
-                    Some(Err(e)) => Step::Failed(e.into()),
+                    Some(Err(e)) => {
+                        log::error!("Horizon: Resource loading failed: {e}");
+                        Step::Failed(e.into())
+                    }
                     Some(Ok(loaded)) => match loading.finish(loaded) {
-                        Ok(Some(game)) => Step::Ready(Box::new(game)),
+                        Ok(Some(game)) => {
+                            log::info!("Horizon: Transitioning from Loading to Game (Ready)!");
+                            Step::Ready(Box::new(game))
+                        }
                         Ok(None) => Step::Done,
-                        Err(e) => Step::Failed(e),
+                        Err(e) => {
+                            log::error!("Horizon: loading.finish failed: {e}");
+                            Step::Failed(e)
+                        }
                     },
                 }
             }

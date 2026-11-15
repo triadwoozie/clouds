@@ -498,30 +498,52 @@ impl Game<'_> {
         let (ready_tx, ready) = channel();
         let (tasks, server_tasks) = channel();
         let server_flags = flags.clone();
-        let thread = std::thread::Builder::new()
-            .name("Server thread".into())
-            .spawn(move || {
-                // MinecraftServer.spin's Thread.setPriority(8).
-                horizon_threads::favour_current();
-                let result = serve(
-                    &res,
-                    pack,
-                    options,
-                    settings,
-                    launch,
-                    server_flags.clone(),
-                    server_tasks,
-                    &ready_tx,
-                );
-                if let Err(e) = result {
-                    log::error!("Horizon: integrated server: {e}");
-                    *server_flags.failure.lock().unwrap() = Some(e.to_string());
-                    let _ = ready_tx.send(Err(e.to_string()));
-                }
-            })?;
+        #[cfg(not(target_arch = "wasm32"))]
+        let thread = Some(
+            std::thread::Builder::new()
+                .name("Server thread".into())
+                .spawn(move || {
+                    // MinecraftServer.spin's Thread.setPriority(8).
+                    horizon_threads::favour_current();
+                    let result = serve(
+                        &res,
+                        pack,
+                        options,
+                        settings,
+                        launch,
+                        server_flags.clone(),
+                        server_tasks,
+                        &ready_tx,
+                    );
+                    if let Err(e) = result {
+                        log::error!("Horizon: integrated server: {e}");
+                        *server_flags.failure.lock().unwrap() = Some(e.to_string());
+                        let _ = ready_tx.send(Err(e.to_string()));
+                    }
+                })?,
+        );
+        #[cfg(target_arch = "wasm32")]
+        let thread = {
+            let result = serve(
+                &res,
+                pack,
+                options,
+                settings,
+                launch,
+                server_flags.clone(),
+                server_tasks,
+                &ready_tx,
+            );
+            if let Err(e) = result {
+                log::error!("Horizon: integrated server: {e}");
+                *server_flags.failure.lock().unwrap() = Some(e.to_string());
+                let _ = ready_tx.send(Err(e.to_string()));
+            }
+            None
+        };
         let handle = Integrated {
             flags,
-            thread: Some(thread),
+            thread,
             tasks,
             world_name: String::new(),
         };

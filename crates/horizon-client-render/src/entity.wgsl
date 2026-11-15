@@ -342,12 +342,12 @@ fn entity_color(in: Out, front: bool) -> vec4<f32> {
         // 33: a translucent item with the glint.
         // Enchantment glint: item.fsh's GLINT path, sampled from
         // enchanted_glint_item at the `GLINT_TEXTURING` UV.
-        color = glint_over(color, textureSample(glint_tex, glint_sampler, in.glint_uv));
+        color = glint_over(color, textureSampleLevel(glint_tex, glint_sampler, in.glint_uv, 0.0));
     } else if in.overlay == 36u {
         // Enchanted armour (mobs::render::ARMOR_GLINT): enchanted_glint_armor at the scrolling model UV.
         color = glint_over(
             color,
-            textureSample(glint_armor_tex, glint_sampler, armor_glint_uv(in.glint_uv)),
+            textureSampleLevel(glint_armor_tex, glint_sampler, armor_glint_uv(in.glint_uv), 0.0),
         );
     }
     let f = max(linear_fog(in.fog_distance.x, globals.fog.x, globals.fog.y),
@@ -438,7 +438,7 @@ fn celestial_color(in: Out) -> vec4<f32> {
                       linear_fog(in.fog_distance.y, globals.fog.z, globals.fog.w));
         return in.color * (1.0 - fog);
     }
-    let color = textureSample(atlas, atlas_sampler, in.uv) * in.color * in.light_color;
+    let color = textureSampleLevel(atlas, atlas_sampler, in.uv, 0.0) * in.color * in.light_color;
     if in.overlay == 45u {
         // A Polytone custom particle drawn additively: the fog over its colour, as vanilla's
         // particle.fsh, under the additive blend (no alpha cutout: its faint texels add up).

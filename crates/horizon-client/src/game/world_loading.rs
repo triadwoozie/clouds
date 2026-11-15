@@ -331,7 +331,10 @@ impl WorldRequest {
 }
 
 pub(super) struct WorldLoader {
+    #[cfg(not(target_arch = "wasm32"))]
     handle: JoinHandle<std::result::Result<PreparedWorld, String>>,
+    #[cfg(target_arch = "wasm32")]
+    result: Option<std::result::Result<PreparedWorld, String>>,
 }
 
 impl WorldLoader {
@@ -346,21 +349,43 @@ impl WorldLoader {
         settings: Settings,
         upgrade: Arc<horizon_world::datafix::progress::UpgradeProgress>,
     ) -> Result<Self> {
-        let handle = std::thread::Builder::new()
-            .name("World initialization".into())
-            .spawn(move || {
-                request
-                    .prepare(&res, &pack, &options, &settings, &upgrade)
-                    .map_err(|e| e.to_string())
-            })?;
-        Ok(Self { handle })
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            let handle = std::thread::Builder::new()
+                .name("World initialization".into())
+                .spawn(move || {
+                    request
+                        .prepare(&res, &pack, &options, &settings, &upgrade)
+                        .map_err(|e| e.to_string())
+                })?;
+            Ok(Self { handle })
+        }
+        #[cfg(target_arch = "wasm32")]
+        {
+            let result = request
+                .prepare(&res, &pack, &options, &settings, &upgrade)
+                .map_err(|e| e.to_string());
+            Ok(Self {
+                result: Some(result),
+            })
+        }
     }
 
-    pub fn finish(self) -> Result<PreparedWorld> {
-        self.handle
-            .join()
-            .map_err(|_| "world initialization worker panicked")?
-            .map_err(Into::into)
+    pub fn finish(mut self) -> Result<PreparedWorld> {
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            self.handle
+                .join()
+                .map_err(|_| "world initialization worker panicked")?
+                .map_err(Into::into)
+        }
+        #[cfg(target_arch = "wasm32")]
+        {
+            self.result
+                .take()
+                .ok_or_else(|| "world loader already finished".to_string())?
+                .map_err(Into::into)
+        }
     }
 }
 

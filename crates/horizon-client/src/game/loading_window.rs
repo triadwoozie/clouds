@@ -125,12 +125,18 @@ pub(super) fn loading_renderer(
     let panorama = panorama
         .cloned()
         .unwrap_or_else(|| Arc::new(horizon_client::gfx::panorama::Faces::colour([0; 4])));
-    let (pixels, width, height) = atlas.map_or((EMPTY_HUD.as_slice(), 1, 1), |a| {
-        (a.pixels.as_slice(), a.width, a.height)
-    });
+    let pixels_cow = atlas.map(|a| a.pixels());
+    let (pixels, width, height) = match (&pixels_cow, atlas) {
+        (Some(cow), Some(a)) => (cow.as_ref(), a.width, a.height),
+        _ => (EMPTY_HUD.as_slice(), 1, 1),
+    };
     let (glint_pixels, glint_width, glint_height) = atlas
         .map_or((EMPTY_GLINT.as_slice(), 1, 1), |a| {
-            (a.glint.0.as_slice(), a.glint.1, a.glint.2)
+            if a.glint.0.len() == (a.glint.1 * a.glint.2 * 4) as usize {
+                (a.glint.0.as_slice(), a.glint.1, a.glint.2)
+            } else {
+                (EMPTY_GLINT.as_slice(), 1, 1)
+            }
         });
     // A glyph rasterized into an earlier texture is not in these pixels; the
     // new texture gets it again when the character is drawn (see
@@ -138,6 +144,7 @@ pub(super) fn loading_renderer(
     if let Some(atlas) = atlas {
         atlas.font.reset_cache();
     }
+    log::info!("Horizon: loading_window calling Renderer::new with previous.is_some = {}", previous.is_some());
     let mut renderer = pollster::block_on(Renderer::new(
         window,
         offscreen,
@@ -163,6 +170,7 @@ pub(super) fn loading_renderer(
         Default::default(),
         previous.map(|r| r.display_reading()).unwrap_or_default(),
     ))?;
+    log::info!("Horizon: loading_window successfully returned from Renderer::new");
     if let Some(atlas) = atlas {
         renderer.hud.sprite_animations = atlas
             .sprite_animations

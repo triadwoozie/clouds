@@ -2639,6 +2639,7 @@ impl Renderer {
         request: output::FrameRequest,
         display: output::DisplayReading,
     ) -> Result<Self> {
+        log::info!("Horizon renderer: Renderer::new enter, previous = {}", previous.is_some());
         let Opened {
             instance,
             surface,

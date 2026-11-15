@@ -805,16 +805,20 @@ impl HudAtlas {
     /// The atlas's pixels: as built, or uncompressed again after
     /// `pack_pixels` (a renderer being rebuilt).
     pub fn pixels(&self) -> std::borrow::Cow<'_, [u8]> {
-        let Some(packed) = self.packed.as_ref().filter(|_| self.pixels.is_empty()) else {
-            return std::borrow::Cow::Borrowed(&self.pixels);
-        };
         let size = (self.width * self.height * 4) as usize;
-        std::borrow::Cow::Owned(
-            lz4_flex::decompress_size_prepended(packed.wait())
-                .ok()
-                .filter(|p| p.len() == size)
-                .unwrap_or_else(|| vec![0; size]),
-        )
+        if self.pixels.len() == size {
+            return std::borrow::Cow::Borrowed(&self.pixels);
+        }
+        if let Some(packed) = self.packed.as_ref() {
+            if let Some(data) = packed.get() {
+                if let Ok(decompressed) = lz4_flex::decompress_size_prepended(data) {
+                    if decompressed.len() == size {
+                        return std::borrow::Cow::Owned(decompressed);
+                    }
+                }
+            }
+        }
+        std::borrow::Cow::Owned(vec![0u8; size])
     }
     /// Keep the pixels compressed from now on, once a renderer has them: the
     /// window's GPU holds the atlas, and a copy as built only serves a
@@ -822,6 +826,8 @@ impl HudAtlas {
     /// API). They are compressed on a thread of their own; `pixels()` waits
     /// for it.
     pub fn pack_pixels(&mut self) {
+        #[cfg(target_arch = "wasm32")]
+        return;
         if self.pixels.is_empty() || self.packed.is_some() {
             return;
         }
