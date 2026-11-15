@@ -321,6 +321,7 @@ impl Drop for Registration {
         // while it holds the sources' read lock); wait for those that did.
         entry.retired.store(true, Ordering::SeqCst);
         let mut sleep = lock(&self.inner.sleep);
+        #[cfg(not(target_arch = "wasm32"))]
         while entry.running.load(Ordering::SeqCst) > 0 {
             sleep = self
                 .inner

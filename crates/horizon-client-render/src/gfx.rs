@@ -8088,7 +8088,7 @@ impl Renderer {
         self.queue.take_waited();
         let (surface_frame, reconfigure) = match acquired {
             None => (None, false),
-            Some(wgpu::CurrentSurfaceTexture::Success(f)) => {
+            Some(wgpu::CurrentSurfaceTexture::Success(f) | wgpu::CurrentSurfaceTexture::Suboptimal(f)) => {
                 #[cfg(target_arch = "wasm32")]
                 if f.texture.width() != self.config.width || f.texture.height() != self.config.height {
                     log::info!(
@@ -8103,7 +8103,6 @@ impl Renderer {
                 }
                 (Some(f), false)
             }
-            Some(wgpu::CurrentSurfaceTexture::Suboptimal(f)) => (Some(f), true),
             Some(wgpu::CurrentSurfaceTexture::Timeout | wgpu::CurrentSurfaceTexture::Occluded) => {
                 return Ok(false);
             }
@@ -8158,6 +8157,19 @@ impl Renderer {
                     .unwrap_or(image)
             }
         };
+        #[cfg(target_arch = "wasm32")]
+        if self.config.width != target_texture.width() || self.config.height != target_texture.height() {
+            log::info!(
+                "Horizon: synchronizing renderer depth size from {}x{} to target {}x{}",
+                self.config.width,
+                self.config.height,
+                target_texture.width(),
+                target_texture.height()
+            );
+            self.config.width = target_texture.width();
+            self.config.height = target_texture.height();
+            self.depth = Self::depth(&self.device, &self.config);
+        }
         // One command buffer for the frame, after the section copies staged
         // since the last one: Metal commits every command buffer wgpu-core
         // makes (one per run of copies and two per pass) on its own.

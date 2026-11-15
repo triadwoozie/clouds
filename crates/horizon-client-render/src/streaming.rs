@@ -411,12 +411,20 @@ impl Mailbox {
         self.try_lock()?.pop_front()
     }
     fn recv_timeout(&self, timeout: std::time::Duration) -> Option<Done> {
-        let done = self.done.lock().unwrap();
-        let (mut done, _) = self
-            .arrived
-            .wait_timeout_while(done, timeout, |done| done.is_empty())
-            .unwrap();
-        done.pop_front()
+        #[cfg(target_arch = "wasm32")]
+        {
+            let _ = timeout;
+            self.done.lock().unwrap().pop_front()
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            let done = self.done.lock().unwrap();
+            let (mut done, _) = self
+                .arrived
+                .wait_timeout_while(done, timeout, |done| done.is_empty())
+                .unwrap();
+            done.pop_front()
+        }
     }
 }
 /// [`Streaming::proto_census`].
